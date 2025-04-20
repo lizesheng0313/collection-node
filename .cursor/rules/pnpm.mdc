@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# 所有的安装依赖相关的请使用pnpm安装
