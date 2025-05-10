@@ -42,6 +42,26 @@ module.exports = appInfo => {
     agent: false,
   };
 
+  // JWT配置
+  config.jwt = {
+    secret: 'blog-jwt-secret-key', // JWT密钥，实际应用中应使用更复杂的密钥
+    expiresIn: '24h', // token过期时间
+  };
+
+  // 完全禁用安全相关功能，包括CSRF
+  config.security = {
+    csrf: {
+      enable: false, // 关闭CSRF
+      ignoreJSON: true, // 忽略JSON请求
+    },
+    domainWhiteList: ['*'],
+  };
+
+  // 禁用Session功能，因为使用JWT不需要Session
+  config.session = {
+    enable: false,
+  };
+
   return {
     ...config,
     ...userConfig,

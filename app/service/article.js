@@ -7,10 +7,11 @@ class ArticleService extends Service {
    * @return {Promise<Object>} 结果
    */
   async create(article) {
-    // 设置创建相关字段
+    // 设置创建相关字段，默认为发布状态
+    article.status = 'published'; // 默认设置为发布状态
     article.collect_time = article.collect_time || new Date();
     article.update_time = new Date();
-    article.publish_time = article.status === 'published' ? new Date() : null;
+    article.publish_time = new Date(); // 直接设置发布时间
 
     const result = await this.app.mysql.insert('articles', article);
     return {
@@ -57,14 +58,15 @@ class ArticleService extends Service {
   /**
    * 查找单个文章
    * @param {Number} id - 文章ID
+   * @param {Object} options - 附加选项
    * @return {Promise<Object>} 文章信息
    */
-  async find(id) {
+  async find(id, options = {}) {
     // 使用mapper中的SQL查询
     const article = await this.app.mysql.get('articles', { id });
     
-    // 如果文章存在且发布，增加阅读量
-    if (article && article.status === 'published') {
+    // 如果文章存在且发布，且不是禁止增加阅读量的请求，则增加阅读量
+    if (article && article.status === 'published' && !options.no_read) {
       await this.app.mysql.query(this.app.mapper.article.increaseReadCount, [id]);
     }
 

@@ -74,8 +74,9 @@ class ArticleController extends Controller {
   async show() {
     const { ctx, service } = this;
     const id = ctx.params.id;
+    const { no_read } = ctx.query;
     try {
-      const article = await service.article.find(id);
+      const article = await service.article.find(id, { no_read: no_read === '1' });
       ctx.body = {
         success: true,
         data: article,
@@ -95,6 +96,9 @@ class ArticleController extends Controller {
    */
   async index() {
     const { ctx, service } = this;
+    // 添加日志，记录当前请求的用户信息
+    console.log('当前访问用户信息:', ctx.state.user);
+    
     const { page = 1, pageSize = 10, status, source } = ctx.query;
     try {
       const result = await service.article.list(page, pageSize, { status, source });
