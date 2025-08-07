@@ -12,7 +12,8 @@
     "egg-jwt": "^3.1.7",
     "egg-mysql": "^5.0.0",
     "egg-scripts": "2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.6.0"
   },
   "devDependencies": {
     "egg-bin": "6",
@@ -31,7 +32,8 @@
     "test:local": "egg-bin test",
     "cov": "egg-bin cov",
     "lint": "eslint .",
-    "ci": "npm run lint && npm run cov"
+    "ci": "npm run lint && npm run cov",
+    "init:github": "node scripts/init-github-tables.js"
   },
   "repository": {
     "type": "git",
