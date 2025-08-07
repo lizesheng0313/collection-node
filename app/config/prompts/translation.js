@@ -74,7 +74,18 @@ function formatProjectIntroPrompt(projectData) {
  * @return {string} 格式化后的提示词
  */
 function formatTranslationPrompt(text) {
-  return `请将以下英文文本翻译成专业、准确的中文，保持技术术语的准确性：\n\n${text}\n\n要求：语言自然流畅，只返回翻译结果。`;
+  return `你是一个专业的技术翻译，请将以下GitHub项目描述翻译成简洁、专业的中文。
+
+原文：${text}
+
+翻译要求：
+1. 重点说明项目的核心功能，不要翻译营销性语言（如"点个星"、"喜欢就"等）
+2. 去掉emoji和装饰性符号
+3. 用一句话概括项目是什么、解决什么问题
+4. 保持技术术语的准确性
+5. 语言简洁专业，避免口语化表达
+
+只返回翻译结果，不要其他内容。`;
 }
 
 // 兼容性：保持旧的TRANSLATION_PROMPT导出
