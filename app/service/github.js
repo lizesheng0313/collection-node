@@ -5,7 +5,7 @@ class GitHubService extends Service {
     super(ctx);
     this.baseURL = 'https://api.github.com';
     this.headers = {
-      'Accept': 'application/vnd.github.v3+json',
+      Accept: 'application/vnd.github.v3+json',
       'User-Agent': 'StarRank-Collection-Node',
     };
 
@@ -29,7 +29,7 @@ class GitHubService extends Service {
 
     try {
       // 构建GitHub Trending URL
-      let trendingUrl = `https://github.com/trending`;
+      let trendingUrl = 'https://github.com/trending';
 
       if (language) {
         trendingUrl += `/${language}`;
@@ -45,17 +45,17 @@ class GitHubService extends Service {
         trendingUrl += `?${params.toString()}`;
       }
 
-      this.logger.info(`🔥 Fetching GitHub Trending: ${trendingUrl}`);
+      this.logger.info(`开始抓取 GitHub 趋势页面: ${trendingUrl}`);
 
       // 爬取GitHub Trending页面
       const response = await this.ctx.curl(trendingUrl, {
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
           'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
+          Connection: 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
         },
         timeout: 30000,
@@ -75,7 +75,7 @@ class GitHubService extends Service {
       const detailedRepos = [];
       for (const repo of limitedRepos) {
         try {
-          const [owner, name] = repo.full_name.split('/');
+          const [ owner, name ] = repo.full_name.split('/');
           const detailRepo = await this.getRepositoryDetails(owner, name);
           if (detailRepo) {
             detailedRepos.push(detailRepo);
@@ -101,36 +101,50 @@ class GitHubService extends Service {
   }
 
   /**
-   * 获取仓库详细信息
+   * 获取仓库详细信息（爬虫方式）
    * @param {string} owner - 仓库所有者
    * @param {string} repo - 仓库名称
    * @return {Promise<Object>} 仓库详细信息
    */
   async getRepositoryDetails(owner, repo) {
     try {
-      const url = `${this.baseURL}/repos/${owner}/${repo}`;
+      const url = `https://github.com/${owner}/${repo}`;
+      this.logger.debug(`抓取仓库页面: ${url}`);
 
       const response = await this.ctx.curl(url, {
         method: 'GET',
-        headers: this.headers,
-        dataType: 'json',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          Connection: 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
         timeout: 30000,
       });
 
       if (response.status !== 200) {
-        throw new Error(`GitHub API error: ${response.status}`);
+        throw new Error(`GitHub page error: ${response.status}`);
       }
 
-      const repoData = this.formatRepositoryData(response.data);
+      const html = response.data.toString();
+      const repoData = this.parseRepositoryPage(html, owner, repo);
 
-      // 获取README中的第一张图片
+      // 获取README内容
       try {
-        const mainImage = await this.getRepositoryMainImage(owner, repo);
-        if (mainImage) {
-          repoData.main_image = mainImage;
+        const readmeContent = await this.getRepositoryReadme(owner, repo);
+        if (readmeContent) {
+          repoData.readme_content = readmeContent;
+
+          // 从README中提取第一张图片
+          const mainImage = this.extractMainImageFromReadme(readmeContent);
+          if (mainImage) {
+            repoData.main_image = mainImage;
+          }
         }
       } catch (error) {
-        this.logger.warn(`Failed to get main image for ${owner}/${repo}:`, error.message);
+        this.logger.warn(`Failed to get README for ${owner}/${repo}:`, error.message);
         // 使用默认图片
         repoData.main_image = this.getDefaultImage(repoData.language);
       }
@@ -138,9 +152,211 @@ class GitHubService extends Service {
       return repoData;
 
     } catch (error) {
-      this.logger.error(`Failed to fetch repository details for ${owner}/${repo}:`, error);
+      this.logger.error(`Failed to crawl repository details for ${owner}/${repo}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * 解析GitHub仓库页面
+   * @param {string} html - 页面HTML内容
+   * @param {string} owner - 仓库所有者
+   * @param {string} repo - 仓库名称
+   * @return {Object} 解析后的仓库数据
+   */
+  parseRepositoryPage(html, owner, repo) {
+    try {
+      const repoData = {
+        // id: 未从页面解析数字ID，保持为空以便数据库使用 github_url 去重
+        full_name: `${owner}/${repo}`,
+        name: repo,
+        owner: {
+          login: owner,
+          avatar_url: '',
+        },
+        description: '',
+        description_cn: '',
+        language: '',
+        stargazers_count: 0,
+        forks_count: 0,
+        watchers_count: 0,
+        size: 0,
+        default_branch: 'main',
+        open_issues_count: 0,
+        topics: [],
+        license: null,
+        created_at: '',
+        updated_at: '',
+        pushed_at: '',
+        html_url: `https://github.com/${owner}/${repo}`,
+        clone_url: `https://github.com/${owner}/${repo}.git`,
+        ssh_url: `git@github.com:${owner}/${repo}.git`,
+        homepage: '',
+        archived: false,
+        disabled: false,
+        private: false,
+        fork: false,
+      };
+
+      // 提取描述 - 从About部分提取
+      const aboutMatch = html.match(/<h2[^>]*>About<\/h2>[\s\S]*?<p[^>]*class="[^"]*f4[^"]*"[^>]*>\s*([^<]+)\s*<\/p>/i);
+      if (aboutMatch && aboutMatch[1]) {
+        repoData.description = aboutMatch[1].trim();
+      } else {
+        // 备用方案：从meta标签提取
+        const descMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"[^>]*>/i);
+        if (descMatch && descMatch[1]) {
+          repoData.description = descMatch[1].trim();
+        }
+      }
+
+      // 提取Star数量 - 匹配新的格式 <span id="repo-stars-counter-star" ... class="Counter js-social-count">12.2k</span>
+      const starMatch = html.match(/<span[^>]*id="repo-stars-counter-star"[^>]*class="[^"]*Counter[^"]*"[^>]*>([^<]+)<\/span>/i);
+      if (starMatch && starMatch[1]) {
+        const starStr = starMatch[1].trim();
+        if (starStr.includes('k')) {
+          repoData.stargazers_count = Math.round(parseFloat(starStr.replace('k', '')) * 1000);
+        } else if (starStr.includes('m')) {
+          repoData.stargazers_count = Math.round(parseFloat(starStr.replace('m', '')) * 1000000);
+        } else {
+          repoData.stargazers_count = parseInt(starStr.replace(/,/g, ''), 10);
+        }
+      } else {
+        // 备用方案：匹配旧格式 <strong>12.2k</strong> stars
+        const starMatchOld = html.match(/<strong>([^<]+)<\/strong>\s*stars?/i);
+        if (starMatchOld && starMatchOld[1]) {
+          const starStr = starMatchOld[1].trim();
+          if (starStr.includes('k')) {
+            repoData.stargazers_count = Math.round(parseFloat(starStr.replace('k', '')) * 1000);
+          } else if (starStr.includes('m')) {
+            repoData.stargazers_count = Math.round(parseFloat(starStr.replace('m', '')) * 1000000);
+          } else {
+            repoData.stargazers_count = parseInt(starStr.replace(/,/g, ''), 10);
+          }
+        }
+      }
+
+      // 提取Fork数量 - 匹配 <strong>1.4k</strong> forks 格式
+      const forkMatch = html.match(/<strong>([^<]+)<\/strong>\s*forks?/i);
+      if (forkMatch && forkMatch[1]) {
+        const forkStr = forkMatch[1].trim();
+        if (forkStr.includes('k')) {
+          repoData.forks_count = Math.round(parseFloat(forkStr.replace('k', '')) * 1000);
+        } else if (forkStr.includes('m')) {
+          repoData.forks_count = Math.round(parseFloat(forkStr.replace('m', '')) * 1000000);
+        } else {
+          repoData.forks_count = parseInt(forkStr.replace(/,/g, ''), 10);
+        }
+      }
+
+      // 提取主要编程语言
+      const langMatch = html.match(/<span[^>]*class="[^"]*color-fg-default[^"]*"[^>]*>\s*([^<]+)\s*<\/span>/);
+      if (langMatch && langMatch[1]) {
+        repoData.language = langMatch[1].trim();
+      }
+
+      // 提取Topics - 匹配 <a href="/topics/python" title="Topic: python" data-view-component="true" class="topic-tag topic-tag-link">
+      const topicsRegex = /<a[^>]*href="\/topics\/([^"]+)"[^>]*class="[^"]*topic-tag[^"]*"[^>]*>/g;
+      const topics = [];
+      let topicMatch;
+      while ((topicMatch = topicsRegex.exec(html)) !== null) {
+        topics.push(topicMatch[1]);
+      }
+      repoData.topics = topics;
+
+      // 提取头像
+      const avatarMatch = html.match(/<img[^>]*class="[^"]*avatar[^"]*"[^>]*src="([^"]+)"[^>]*>/);
+      if (avatarMatch && avatarMatch[1]) {
+        repoData.owner.avatar_url = avatarMatch[1];
+      }
+
+      this.logger.debug(`解析仓库: ${repoData.full_name}，Stars: ${repoData.stargazers_count}，语言: ${repoData.language}`);
+
+      return repoData;
+    } catch (error) {
+      this.logger.error(`Failed to parse repository page for ${owner}/${repo}:`, error);
+      // 返回基本数据
+      return {
+        full_name: `${owner}/${repo}`,
+        name: repo,
+        owner: { login: owner, avatar_url: '' },
+        description: '',
+        language: '',
+        stargazers_count: 0,
+        forks_count: 0,
+        html_url: `https://github.com/${owner}/${repo}`,
+      };
+    }
+  }
+
+  /**
+   * 获取仓库README内容（爬虫方式）
+   * @param {string} owner - 仓库所有者
+   * @param {string} repo - 仓库名称
+   * @return {Promise<string>} README内容
+   */
+  async getRepositoryReadme(owner, repo) {
+    try {
+      // 尝试获取README.md
+      const readmeUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
+
+      const response = await this.ctx.curl(readmeUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+        timeout: 15000,
+      });
+
+      if (response.status === 200) {
+        return response.data.toString();
+      }
+
+      // 如果main分支没有，尝试master分支
+      const masterReadmeUrl = `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`;
+      const masterResponse = await this.ctx.curl(masterReadmeUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+        timeout: 15000,
+      });
+
+      if (masterResponse.status === 200) {
+        return masterResponse.data.toString();
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.warn(`Failed to get README for ${owner}/${repo}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * 从README内容中提取主图片
+   * @param {string} readmeContent - README内容
+   * @return {string|null} 图片URL
+   */
+  extractMainImageFromReadme(readmeContent) {
+    if (!readmeContent) return null;
+
+    // 匹配Markdown图片语法: ![alt](url)
+    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const match = imgRegex.exec(readmeContent);
+
+    if (match && match[2]) {
+      const imageUrl = match[2].trim();
+
+      // 如果是相对路径，转换为绝对路径
+      if (imageUrl.startsWith('./') || imageUrl.startsWith('../') || !imageUrl.startsWith('http')) {
+        return null; // 暂时不处理相对路径
+      }
+
+      return imageUrl;
+    }
+
+    return null;
   }
 
   /**
@@ -262,13 +478,13 @@ class GitHubService extends Service {
       // 提取项目名称
       while ((match = repoRegex.exec(html)) !== null && index < 25) {
         const fullName = match[1];
-        const [owner, name] = fullName.split('/');
+        const [ owner, name ] = fullName.split('/');
 
         if (owner && name) {
           repositories.push({
             id: Date.now() + index, // 临时ID
             full_name: fullName,
-            name: name,
+            name,
             owner: { login: owner },
             html_url: `https://github.com/${fullName}`,
             description: '', // 稍后通过API获取
@@ -286,13 +502,13 @@ class GitHubService extends Service {
             pushed_at: null,
             clone_url: `https://github.com/${fullName}.git`,
             homepage: null,
-            default_branch: 'main'
+            default_branch: 'main',
           });
           index++;
         }
       }
 
-      this.logger.info(`📊 Parsed ${repositories.length} repositories from GitHub Trending`);
+      this.logger.info(`已解析 ${repositories.length} 个项目（GitHub 趋势）`);
 
     } catch (error) {
       this.logger.error('Failed to parse GitHub Trending page:', error);
@@ -346,9 +562,9 @@ class GitHubService extends Service {
   extractFirstImage(content, owner, repo) {
     // 匹配markdown图片语法: ![alt](url) 或 <img src="url">
     const patterns = [
-      /!\[.*?\]\((.*?)\)/,  // ![alt](url)
-      /<img[^>]+src=["']([^"']+)["']/i,  // <img src="url">
-      /!\[.*?\]:\s*(.*?)$/m,  // ![alt]: url
+      /!\[.*?\]\((.*?)\)/, // ![alt](url)
+      /<img[^>]+src=["']([^"']+)["']/i, // <img src="url">
+      /!\[.*?\]:\s*(.*?)$/m, // ![alt]: url
     ];
 
     for (const pattern of patterns) {
@@ -379,7 +595,7 @@ class GitHubService extends Service {
    * @return {boolean} 是否是图片
    */
   isImageUrl(url) {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp'];
+    const imageExtensions = [ '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp' ];
     const lowerUrl = url.toLowerCase();
     return imageExtensions.some(ext => lowerUrl.includes(ext)) ||
            lowerUrl.includes('githubusercontent.com') ||
@@ -393,21 +609,21 @@ class GitHubService extends Service {
    */
   getDefaultImage(language) {
     const defaultImages = {
-      'JavaScript': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/javascript/javascript.png',
-      'TypeScript': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/typescript/typescript.png',
-      'Python': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/python/python.png',
-      'Java': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/java/java.png',
-      'Go': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/go/go.png',
-      'Rust': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/rust/rust.png',
+      JavaScript: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/javascript/javascript.png',
+      TypeScript: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/typescript/typescript.png',
+      Python: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/python/python.png',
+      Java: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/java/java.png',
+      Go: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/go/go.png',
+      Rust: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/rust/rust.png',
       'C++': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/cpp/cpp.png',
       'C#': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/csharp/csharp.png',
-      'PHP': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/php/php.png',
-      'Ruby': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/ruby/ruby.png',
-      'Swift': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/swift/swift.png',
-      'Kotlin': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/kotlin/kotlin.png',
-      'Dart': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/dart/dart.png',
-      'Vue': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/vue/vue.png',
-      'React': 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/react/react.png',
+      PHP: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/php/php.png',
+      Ruby: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/ruby/ruby.png',
+      Swift: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/swift/swift.png',
+      Kotlin: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/kotlin/kotlin.png',
+      Dart: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/dart/dart.png',
+      Vue: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/vue/vue.png',
+      React: 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/react/react.png',
     };
 
     return defaultImages[language] || 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/github/github.png';

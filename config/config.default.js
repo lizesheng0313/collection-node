@@ -26,7 +26,7 @@ module.exports = appInfo => {
     // 单数据库信息配置
     client: {
       // host
-      host: '8.140.27.159',
+      host: '127.0.0.1',
       // 端口号
       port: '3306',
       // 用户名
@@ -37,12 +37,8 @@ module.exports = appInfo => {
       database: 'blog',
       // 连接超时时间
       connectTimeout: 60000,
-      // 获取连接超时时间
-      acquireTimeout: 60000,
       // 连接池配置
       connectionLimit: 10,
-      // 重连配置
-      reconnect: true,
       // SSL配置
       ssl: false,
     },
@@ -64,13 +60,13 @@ module.exports = appInfo => {
       enable: false, // 关闭CSRF
       ignoreJSON: true, // 忽略JSON请求
     },
-    domainWhiteList: ['*'],
+    domainWhiteList: [ '*' ],
   };
 
   // CORS配置
   config.cors = {
     origin: '*',
-    allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH'
+    allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
   };
 
   // 禁用Session功能，因为使用JWT不需要Session

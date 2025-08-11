@@ -19,13 +19,13 @@ module.exports = options => {
       if (token.startsWith('Bearer ')) {
         tokenValue = token.slice(7);
       }
-      
+
       // 解析token
       const decoded = ctx.app.jwt.verify(tokenValue, ctx.app.config.jwt.secret);
-      
+
       // 将用户信息挂载到ctx上
       ctx.state.user = decoded;
-      
+
       await next();
     } catch (err) {
       console.error('JWT验证失败:', err.message);
@@ -36,4 +36,4 @@ module.exports = options => {
       };
     }
   };
-}; 
+};

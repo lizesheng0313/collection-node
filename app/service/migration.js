@@ -33,7 +33,7 @@ class MigrationService extends Service {
       'homepage VARCHAR(500) NULL',
       'license VARCHAR(100) NULL',
       'article_type ENUM("blog", "github_project") DEFAULT "blog"',
-      'overall_score DECIMAL(3,1) NULL'
+      'overall_score DECIMAL(3,1) NULL',
     ];
 
     for (const field of fields) {

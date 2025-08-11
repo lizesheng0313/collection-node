@@ -12,13 +12,13 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: result,
-        message: '文章创建成功'
+        message: '文章创建成功',
       };
     } catch (error) {
       ctx.body = {
         success: false,
         message: '文章创建失败',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -35,13 +35,13 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: result,
-        message: '文章更新成功'
+        message: '文章更新成功',
       };
     } catch (error) {
       ctx.body = {
         success: false,
         message: '文章更新失败',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -57,13 +57,13 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: result,
-        message: '文章删除成功'
+        message: '文章删除成功',
       };
     } catch (error) {
       ctx.body = {
         success: false,
         message: '文章删除失败',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -80,13 +80,13 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: article,
-        message: '获取文章成功'
+        message: '获取文章成功',
       };
     } catch (error) {
       ctx.body = {
         success: false,
         message: '获取文章失败',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -110,13 +110,13 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: result,
-        message: '获取文章列表成功'
+        message: '获取文章列表成功',
       };
     } catch (error) {
       ctx.body = {
         success: false,
         message: '获取文章列表失败',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -134,7 +134,7 @@ class ArticleController extends Controller {
       min_stars,
       trending_period,
       sort = 'stars_count',
-      order = 'desc'
+      order = 'desc',
     } = ctx.query;
 
     try {
@@ -144,14 +144,14 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: result,
-        message: 'GitHub项目列表获取成功'
+        message: 'GitHub项目列表获取成功',
       };
     } catch (error) {
       ctx.logger.error('Failed to get GitHub projects:', error);
       ctx.body = {
         success: false,
         message: 'GitHub项目列表获取失败',
-        error: error.message
+        error: error.message,
       };
       ctx.status = 500;
     }
@@ -172,7 +172,7 @@ class ArticleController extends Controller {
       if (!article) {
         ctx.body = {
           success: false,
-          message: '项目不存在'
+          message: '项目不存在',
         };
         ctx.status = 404;
         return;
@@ -181,7 +181,7 @@ class ArticleController extends Controller {
       // 增加阅读量
       if (article.article_type === 'github_project') {
         await service.article.update(article.id, {
-          read_count: (article.read_count || 0) + 1
+          read_count: (article.read_count || 0) + 1,
         });
         article.read_count = (article.read_count || 0) + 1;
       }
@@ -189,14 +189,14 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: article,
-        message: 'GitHub项目详情获取成功'
+        message: 'GitHub项目详情获取成功',
       };
     } catch (error) {
       ctx.logger.error(`Failed to get GitHub project ${fullName}:`, error);
       ctx.body = {
         success: false,
         message: 'GitHub项目详情获取失败',
-        error: error.message
+        error: error.message,
       };
       ctx.status = 500;
     }
@@ -233,16 +233,16 @@ class ArticleController extends Controller {
           language: row.language,
           count: row.count,
           avg_stars: Math.round(row.avg_stars),
-          total_stars: row.total_stars
+          total_stars: row.total_stars,
         })),
-        message: '编程语言统计获取成功'
+        message: '编程语言统计获取成功',
       };
     } catch (error) {
       ctx.logger.error('Failed to get language statistics:', error);
       ctx.body = {
         success: false,
         message: '编程语言统计获取失败',
-        error: error.message
+        error: error.message,
       };
       ctx.status = 500;
     }
@@ -279,18 +279,18 @@ class ArticleController extends Controller {
       ctx.body = {
         success: true,
         data: results,
-        message: '评分分布获取成功'
+        message: '评分分布获取成功',
       };
     } catch (error) {
       ctx.logger.error('Failed to get score distribution:', error);
       ctx.body = {
         success: false,
         message: '评分分布获取失败',
-        error: error.message
+        error: error.message,
       };
       ctx.status = 500;
     }
   }
 }
 
-module.exports = ArticleController; 
+module.exports = ArticleController;

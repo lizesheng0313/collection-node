@@ -31,17 +31,18 @@ class ArticleService extends Service {
    * 创建GitHub项目文章（简化版）
    * @param {Object} repoData - GitHub仓库数据
    * @param {Object} analysisData - 商业价值分析数据
+   * @param {string} period - 热门周期
    * @return {Promise<Object>} 结果
    */
-  async createGitHubProject(repoData, analysisData = null) {
+  async createGitHubProject(repoData, analysisData = null, period = null) {
     const article = {
       article_type: 'github_project',
       title: `GitHub项目: ${repoData.full_name}`,
       source: 'GitHub',
       content: this.generateGitHubProjectContent(repoData, analysisData),
 
-      // GitHub核心字段
-      github_id: repoData.id,
+      // GitHub核心字段（id 可能为空，保留数值列语义；用 url 去重）
+      github_id: typeof repoData.id === 'number' ? repoData.id : null,
       github_full_name: repoData.full_name,
       github_url: repoData.html_url,
       original_description: repoData.description,
@@ -49,13 +50,17 @@ class ArticleService extends Service {
       project_intro: repoData.project_intro,
       main_image: repoData.main_image,
       programming_language: repoData.language,
-      stars_count: repoData.stars_count,
+      // 兼容解析字段名：优先 stars_count，其次 stargazers_count
+      stars_count: (repoData.stars_count ?? repoData.stargazers_count ?? 0),
       forks_count: repoData.forks_count,
       topics: (repoData.topics || []).join(','),
 
       // 分析相关字段
       overall_score: analysisData ? analysisData.overall_score : null,
       business_analysis: analysisData ? JSON.stringify(analysisData) : null,
+
+      // 热门周期
+      trending_period: period,
     };
 
     return await this.create(article);
@@ -105,10 +110,10 @@ class ArticleService extends Service {
   async find(id, options = {}) {
     // 使用mapper中的SQL查询
     const article = await this.app.mysql.get('articles', { id });
-    
+
     // 如果文章存在且发布，且不是禁止增加阅读量的请求，则增加阅读量
     if (article && article.status === 'published' && !options.no_read) {
-      await this.app.mysql.query(this.app.mapper.article.increaseReadCount, [id]);
+      await this.app.mysql.query(this.app.mapper.article.increaseReadCount, [ id ]);
     }
 
     return article;
@@ -135,13 +140,13 @@ class ArticleService extends Service {
     // 构建查询条件
     const queryOptions = {
       where,
-      orders: [['collect_time', 'desc']],
+      orders: [[ 'collect_time', 'desc' ]],
       limit,
       offset,
     };
 
     // 获取总数和列表
-    const [total, list] = await Promise.all([
+    const [ total, list ] = await Promise.all([
       this.app.mysql.count('articles', where),
       this.app.mysql.select('articles', queryOptions),
     ]);
@@ -172,7 +177,7 @@ class ArticleService extends Service {
       where.programming_language = filters.language;
     }
     if (filters.min_stars) {
-      where.stars_count = ['>=', parseInt(filters.min_stars)];
+      where.stars_count = [ '>=', parseInt(filters.min_stars) ];
     }
     if (filters.trending_period) {
       where.trending_period = filters.trending_period;
@@ -182,17 +187,15 @@ class ArticleService extends Service {
   }
 
   /**
-   * 根据GitHub ID查找项目
-   * @param {Number} githubId - GitHub仓库ID
+   * 根据GitHub URL查找项目
+   * @param {String} githubUrl - GitHub仓库URL地址
    * @return {Promise<Object>} 项目信息
    */
-  async findByGitHubId(githubId) {
+  async findByGitHubId(githubUrl) {
     const article = await this.app.mysql.get('articles', {
-      github_id: githubId,
-      article_type: 'github_project'
+      github_url: githubUrl,
+      article_type: 'github_project',
     });
-    return article;
-
     return article ? this.formatArticleData(article) : null;
   }
 
@@ -204,7 +207,7 @@ class ArticleService extends Service {
   async findByGitHubFullName(fullName) {
     const article = await this.app.mysql.get('articles', {
       github_full_name: fullName,
-      article_type: 'github_project'
+      article_type: 'github_project',
     });
 
     return article ? this.formatArticleData(article) : null;
@@ -215,9 +218,10 @@ class ArticleService extends Service {
    * @param {Number} id - 文章ID
    * @param {Object} repoData - 更新的仓库数据
    * @param {Object} analysisData - 更新的分析数据
+   * @param {string} period - 热门周期
    * @return {Promise<Object>} 结果
    */
-  async updateGitHubProject(id, repoData, analysisData = null) {
+  async updateGitHubProject(id, repoData, analysisData = null, period = null) {
     const updateData = {
       update_time: new Date(),
       stars_count: repoData.stars_count,
@@ -229,10 +233,20 @@ class ArticleService extends Service {
       updateData.translated_description = repoData.description_cn;
     }
 
+    // 如果有项目介绍更新
+    if (repoData.project_intro) {
+      updateData.project_intro = repoData.project_intro;
+    }
+
     // 如果有分析数据更新
     if (analysisData) {
       updateData.overall_score = analysisData.overall_score;
       updateData.content = this.generateGitHubProjectContent(repoData, analysisData);
+    }
+
+    // 如果有热门周期更新
+    if (period) {
+      updateData.trending_period = period;
     }
 
     return await this.update(id, updateData);
@@ -247,7 +261,7 @@ class ArticleService extends Service {
     let content = `# ${repoData.full_name}\n\n`;
 
     // 基本信息
-    content += `## 📊 项目信息\n\n`;
+    content += '## 📊 项目信息\n\n';
     content += `- **GitHub地址**: [${repoData.html_url}](${repoData.html_url})\n`;
     content += `- **编程语言**: ${repoData.language || '未知'}\n`;
     content += `- **Star数量**: ${repoData.stars_count || 0}\n`;
@@ -255,7 +269,7 @@ class ArticleService extends Service {
 
     // 项目描述
     if (repoData.description) {
-      content += `## 📝 项目描述\n\n`;
+      content += '## 📝 项目描述\n\n';
       content += `**原文**: ${repoData.description}\n\n`;
       if (repoData.description_cn) {
         content += `**中文**: ${repoData.description_cn}\n\n`;
@@ -264,14 +278,14 @@ class ArticleService extends Service {
 
     // 技术标签
     if (repoData.topics && repoData.topics.length > 0) {
-      content += `## 🏷️ 技术标签\n\n`;
+      content += '## 🏷️ 技术标签\n\n';
       const topics = Array.isArray(repoData.topics) ? repoData.topics : repoData.topics.split(',');
       content += topics.map(topic => `\`${topic.trim()}\``).join(' ') + '\n\n';
     }
 
     // 商业价值分析
     if (analysisData && analysisData.overall_score) {
-      content += `## 💼 商业价值分析\n\n`;
+      content += '## 💼 商业价值分析\n\n';
       content += `**综合评分**: ${analysisData.overall_score}/10\n\n`;
 
       if (analysisData.summary) {
@@ -279,8 +293,8 @@ class ArticleService extends Service {
       }
     }
 
-    content += `---\n\n`;
-    content += `*本文由AI自动生成和分析*`;
+    content += '---\n\n';
+    content += '*本文由AI自动生成和分析*';
 
     return content;
   }

@@ -6,19 +6,19 @@ class CrawlerController extends Controller {
    */
   async status() {
     const { ctx } = this;
-    
+
     try {
       const stats = ctx.service.crawler.getCrawlStats();
-      
+
       // 获取数据库中的项目统计
       const totalProjects = await ctx.app.mysql.query(
         'SELECT COUNT(*) as count FROM articles WHERE article_type = ?',
-        ['github_project']
+        [ 'github_project' ]
       );
 
       const todayProjects = await ctx.app.mysql.query(
         'SELECT COUNT(*) as count FROM articles WHERE article_type = ? AND DATE(created_at) = CURDATE()',
-        ['github_project']
+        [ 'github_project' ]
       );
 
       ctx.body = {
@@ -27,16 +27,16 @@ class CrawlerController extends Controller {
           crawler: stats,
           database: {
             totalProjects: totalProjects[0].count,
-            todayProjects: todayProjects[0].count
-          }
-        }
+            todayProjects: todayProjects[0].count,
+          },
+        },
       };
     } catch (error) {
       ctx.logger.error('Failed to get crawler status:', error);
       ctx.body = {
         success: false,
         message: 'Failed to get crawler status',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -50,9 +50,9 @@ class CrawlerController extends Controller {
 
     try {
       ctx.logger.info(`Manual crawl triggered: ${period} ${language || 'all'} (${limit})`);
-      
+
       const newCount = await ctx.service.crawler.manualCrawl(period, language, parseInt(limit));
-      
+
       ctx.body = {
         success: true,
         data: {
@@ -60,15 +60,15 @@ class CrawlerController extends Controller {
           newProjects: newCount,
           period,
           language: language || 'all',
-          limit: parseInt(limit)
-        }
+          limit: parseInt(limit),
+        },
       };
     } catch (error) {
       ctx.logger.error('Manual crawl failed:', error);
       ctx.body = {
         success: false,
         message: 'Manual crawl failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -82,14 +82,14 @@ class CrawlerController extends Controller {
 
     try {
       const where = {
-        article_type: 'github_project'
+        article_type: 'github_project',
       };
 
       if (period) {
         // 根据period筛选时间范围
         const now = new Date();
         let startDate;
-        
+
         switch (period) {
           case 'daily':
             startDate = new Date(now.setHours(0, 0, 0, 0));
@@ -101,7 +101,7 @@ class CrawlerController extends Controller {
             startDate = new Date(now.setMonth(now.getMonth() - 1));
             break;
         }
-        
+
         if (startDate) {
           where.created_at = { $gte: startDate };
         }
@@ -115,19 +115,19 @@ class CrawlerController extends Controller {
         where,
         page: parseInt(page),
         limit: parseInt(limit),
-        order: [['created_at', 'DESC']]
+        order: [[ 'created_at', 'DESC' ]],
       });
 
       ctx.body = {
         success: true,
-        data: result
+        data: result,
       };
     } catch (error) {
       ctx.logger.error('Failed to get crawl history:', error);
       ctx.body = {
         success: false,
         message: 'Failed to get crawl history',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -140,19 +140,19 @@ class CrawlerController extends Controller {
 
     try {
       ctx.service.crawler.clearCrawlHistory();
-      
+
       ctx.body = {
         success: true,
         data: {
-          message: 'Crawl history cache cleared successfully'
-        }
+          message: 'Crawl history cache cleared successfully',
+        },
       };
     } catch (error) {
       ctx.logger.error('Failed to clear crawl cache:', error);
       ctx.body = {
         success: false,
         message: 'Failed to clear crawl cache',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -177,8 +177,8 @@ class CrawlerController extends Controller {
 
       // 预定义的热门语言
       const popularLanguages = [
-        'JavaScript', 'Python', 'Java', 'TypeScript', 'Go', 
-        'Rust', 'C++', 'C#', 'PHP', 'Swift', 'Kotlin', 'Ruby'
+        'JavaScript', 'Python', 'Java', 'TypeScript', 'Go',
+        'Rust', 'C++', 'C#', 'PHP', 'Swift', 'Kotlin', 'Ruby',
       ];
 
       ctx.body = {
@@ -187,16 +187,16 @@ class CrawlerController extends Controller {
           popular: popularLanguages,
           fromDatabase: languages.map(lang => ({
             name: lang.programming_language,
-            count: lang.count
-          }))
-        }
+            count: lang.count,
+          })),
+        },
       };
     } catch (error) {
       ctx.logger.error('Failed to get languages:', error);
       ctx.body = {
         success: false,
         message: 'Failed to get languages',
-        error: error.message
+        error: error.message,
       };
     }
   }

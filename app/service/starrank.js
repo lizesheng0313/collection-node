@@ -20,36 +20,68 @@ class StarRankService extends Service {
 
       // 处理每个仓库：翻译描述
       const processedRepos = [];
-      for (const repo of repositories) {
+      for (let i = 0; i < repositories.length; i++) {
+        const repo = repositories[i];
         try {
+          // 已存在则跳过重处理
+          try {
+            const existed = await this.service.article.findByGitHubId(repo.html_url);
+            if (existed) {
+              this.logger.info(`已存在，跳过：${repo.full_name}`);
+              continue;
+            }
+          } catch (_) {}
+          // 五步进度（带信息与进度）
+          this.logger.info(`开始爬取 [${i + 1}/${repositories.length}]：${repo.full_name || repo.name}`);
+          this.logger.info(`标题：${repo.name || repo.full_name}`);
           // 翻译描述
           if (repo.description && !repo.description_cn) {
-            // 先检查缓存
+            this.logger.info(`开始翻译：${repo.description.slice(0, 50)}${repo.description.length > 50 ? '...' : ''}`);
             const cached = await this.getCachedTranslation(repo.description);
             if (cached) {
               repo.description_cn = cached;
+              this.logger.debug('翻译命中缓存');
             } else {
-              // 调用AI翻译
               const translated = await this.service.ai.translateToChinese(repo.description);
               repo.description_cn = translated;
-              // 保存到缓存
               await this.saveCachedTranslation(repo.description, translated);
             }
           }
 
-          // 保存到数据库
-          const repoId = await this.saveRepository(repo);
-          repo.db_id = repoId;
-
-          // 异步触发商业价值分析
-          if (repoId) {
-            this.triggerBusinessAnalysis(repo.full_name, repoId);
+          // 生成项目介绍
+          const cacheKey = `project_intro_${repo.full_name.replace('/', '_')}`;
+          const cached = await this.getCachedTranslation(cacheKey);
+          if (cached) {
+            repo.project_intro = cached;
+          } else {
+            const projectIntro = await this.service.ai.generateProjectIntro(repo);
+            repo.project_intro = projectIntro;
+            await this.saveCachedTranslation(cacheKey, projectIntro);
           }
 
-          processedRepos.push(repo);
+          // 分析并保存
+          this.logger.info(`开始分析：${repo.full_name}`);
+
+          try {
+            const analysis = await this.service.ai.analyzeBusinessValue(repo);
+            if (analysis && analysis.overall_score) {
+              try {
+                const repoId = await this.saveRepository(repo, analysis, period);
+                repo.db_id = repoId;
+                this.logger.info(`入库完成：ID=${repoId}，评分=${analysis.overall_score}`);
+                processedRepos.push(repo);
+              } catch (error) {
+                this.logger.error(`❌ 入库失败：${repo.full_name}`, error);
+              }
+            } else {
+              this.logger.warn(`❌ 分析失败：${repo.full_name}，跳过入库`);
+            }
+          } catch (analysisError) {
+            this.logger.error(`❌ 分析异常：${repo.full_name}，原因：${analysisError.message}`);
+          }
         } catch (error) {
-          this.logger.warn(`Error processing repo ${repo.full_name}:`, error);
-          processedRepos.push(repo); // 即使处理失败也返回原始数据
+          this.logger.warn(`处理仓库出错：${repo.full_name}`, error);
+          processedRepos.push(repo);
         }
       }
 
@@ -67,7 +99,7 @@ class StarRankService extends Service {
         },
       };
     } catch (error) {
-      this.logger.error('Failed to get trending repositories:', error);
+      this.logger.error('获取热门仓库失败：', error);
       throw error;
     }
   }
@@ -80,11 +112,9 @@ class StarRankService extends Service {
    */
   async getRepositoryAnalysis(owner, repo) {
     try {
-      this.logger.info(`Starting analysis for ${owner}/${repo}`);
-
+      this.logger.info(`开始分析：${owner}/${repo}`);
       // 获取仓库详细信息
       const repoData = await this.service.github.getRepositoryDetails(owner, repo);
-
       // 翻译项目描述
       if (repoData.description && !repoData.description_cn) {
         const cached = await this.getCachedTranslation(repoData.description);
@@ -96,7 +126,6 @@ class StarRankService extends Service {
           await this.saveCachedTranslation(repoData.description, translated);
         }
       }
-
       // 生成项目介绍
       const cacheKey = `project_intro_${owner}_${repo}`;
       const cached = await this.getCachedTranslation(cacheKey);
@@ -107,30 +136,19 @@ class StarRankService extends Service {
         repoData.project_intro = projectIntro;
         await this.saveCachedTranslation(cacheKey, projectIntro);
       }
-
       // 商业价值分析
       const analysis = await this.service.ai.analyzeBusinessValue(repoData);
-
-      // 验证分析结果
       if (!analysis || !analysis.overall_score) {
         throw new Error('商业价值分析失败，无法保存项目');
       }
-
       // 保存到数据库
       const repoId = await this.saveRepository(repoData, analysis);
-
       return {
         success: true,
-        data: {
-          repository: repoData,
-          analysis,
-          db_ids: {
-            repository: repoId,
-          },
-        },
+        data: { repository: repoData, analysis, db_ids: { repository: repoId } },
       };
     } catch (error) {
-      this.logger.error(`Failed to analyze repository ${owner}/${repo}:`, error);
+      this.logger.error(`分析失败：${owner}/${repo}`, error);
       throw error;
     }
   }
@@ -199,7 +217,7 @@ class StarRankService extends Service {
         }
       }
 
-      const allResults = [...dbResults, ...githubResults];
+      const allResults = [ ...dbResults, ...githubResults ];
 
       return {
         success: true,
@@ -258,7 +276,7 @@ class StarRankService extends Service {
       `;
 
       const offset = (page - 1) * limit;
-      const results = await this.app.mysql.query(sql, [limit, offset]);
+      const results = await this.app.mysql.query(sql, [ limit, offset ]);
 
       return results.map(row => this.service.article.formatArticleData(row));
     } catch (error) {
@@ -271,95 +289,36 @@ class StarRankService extends Service {
    * 保存GitHub项目为文章
    * @param {Object} repoData - 仓库数据
    * @param {Object} analysisData - 分析数据
+   * @param {string} period - 热门周期
    * @return {Promise<number>} 文章ID
    */
-  async saveRepository(repoData, analysisData = null) {
+  async saveRepository(repoData, analysisData = null, period = null) {
     try {
-      // 检查是否已存在
-      const existing = await this.service.article.findByGitHubId(repoData.id);
+      this.logger.info(`[SAVE] 💾 Upsert ${repoData.full_name} url=${repoData.html_url}`);
+
+      // 检查是否已存在（用 github_url 去重）
+      const existing = await this.service.article.findByGitHubId(repoData.html_url);
 
       if (existing) {
         // 更新现有项目
         const result = await this.service.article.updateGitHubProject(
           existing.id,
           repoData,
-          analysisData
+          analysisData,
+          period
         );
         return existing.id;
-      } else {
-        // 创建新的GitHub项目文章
-        const result = await this.service.article.createGitHubProject(repoData, analysisData);
-        return result.id;
       }
+      // 创建新的GitHub项目文章
+      const result = await this.service.article.createGitHubProject(repoData, analysisData, period);
+      return result.id;
+
     } catch (error) {
       this.logger.error('Failed to save repository:', error);
       throw error;
     }
   }
 
-  /**
-   * 保存商业价值分析结果
-   * @param {number} repoId - 仓库ID
-   * @param {Object} analysis - 分析结果
-   * @return {Promise<number>} 分析ID
-   */
-  async saveAnalysis(repoId, analysis) {
-    try {
-      // 计算总分
-      const scores = Object.values(analysis.analysis || {}).map(item => item.score || 0);
-      const overallScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-
-      const data = {
-        article_id: repoId,
-        analysis_type: 'business_value',
-        analysis_data: JSON.stringify(analysis),
-        overall_score: overallScore,
-        ai_model: 'deepseek',
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      const result = await this.app.mysql.insert('analysis_results', data);
-      return result.insertId;
-    } catch (error) {
-      this.logger.error('Failed to save analysis:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 保存分析历史记录
-   * @param {number} articleId - 文章ID
-   * @param {string} analysisType - 分析类型
-   * @param {Object} analysisData - 分析数据
-   * @param {string} aiModel - AI模型
-   * @param {string} prompt - 使用的提示词
-   * @param {string} aiResponse - AI原始响应
-   * @param {number} processingTime - 处理时间(毫秒)
-   * @return {Promise<number>} 分析历史ID
-   */
-  async saveAnalysisHistory(articleId, analysisType, analysisData, aiModel, prompt, aiResponse, processingTime) {
-    try {
-      const data = {
-        article_id: articleId,
-        analysis_type: analysisType,
-        ai_model: aiModel,
-        prompt_used: prompt,
-        ai_response: aiResponse,
-        analysis_result: JSON.stringify(analysisData),
-        processing_time_ms: processingTime,
-        success: analysisData ? 1 : 0,
-        error_message: analysisData ? null : 'Analysis failed',
-        created_at: new Date(),
-      };
-
-      const result = await this.app.mysql.insert('analysis_history', data);
-      return result.insertId;
-    } catch (error) {
-      this.logger.error('Failed to save analysis history:', error);
-      throw error;
-    }
-  }
 
   /**
    * 获取缓存的翻译
@@ -433,47 +392,7 @@ class StarRankService extends Service {
     };
   }
 
-  /**
-   * 异步触发商业价值分析
-   * @param {string} fullName - GitHub项目全名 owner/repo
-   * @param {number} repoId - 数据库中的项目ID
-   */
-  triggerBusinessAnalysis(fullName, repoId) {
-    // 异步执行，不阻塞爬虫流程
-    setTimeout(async () => {
-      try {
-        this.logger.info(`🤖 Starting AI analysis for ${fullName}...`);
 
-        const [owner, repo] = fullName.split('/');
-
-        // 获取项目详细信息
-        const repoData = await this.service.github.getRepository(owner, repo);
-
-        if (repoData.success) {
-          // 进行AI商业价值分析
-          const analysis = await this.service.ai.analyzeBusinessValue(repoData.data);
-
-          if (analysis && analysis.overall_score) {
-            // 保存分析结果
-            await this.saveAnalysis(repoId, analysis);
-
-            // 更新项目的综合评分
-            await this.service.article.update(repoId, {
-              overall_score: analysis.overall_score
-            });
-
-            this.logger.info(`✅ AI analysis completed for ${fullName}, score: ${analysis.overall_score}`);
-          } else {
-            this.logger.warn(`⚠️ AI analysis returned invalid data for ${fullName}`);
-          }
-        } else {
-          this.logger.warn(`⚠️ Failed to get repository data for ${fullName}`);
-        }
-      } catch (error) {
-        this.logger.error(`❌ AI analysis failed for ${fullName}:`, error.message);
-      }
-    }, 2000); // 延迟2秒执行，确保项目已保存
-  }
 }
 
 module.exports = StarRankService;

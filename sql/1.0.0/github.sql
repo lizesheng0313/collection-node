@@ -28,14 +28,16 @@ ADD COLUMN `thumbnail` VARCHAR(500) NULL COMMENT '缩略图',
 ADD COLUMN `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
 ADD COLUMN `project_intro` TEXT NULL COMMENT '项目介绍',
 ADD COLUMN `main_image` VARCHAR(500) NULL COMMENT '项目主图',
-ADD COLUMN `business_analysis` JSON NULL COMMENT '商业价值分析';
+ADD COLUMN `business_analysis` JSON NULL COMMENT '商业价值分析',
+ADD COLUMN `trending_period` ENUM('daily', 'weekly', 'monthly') NULL COMMENT '热门周期';
 
 -- 2. 添加索引优化查询性能
 ALTER TABLE `articles`
 ADD INDEX `idx_article_type` (`article_type`),
 ADD INDEX `idx_github_id` (`github_id`),
 ADD INDEX `idx_github_full_name` (`github_full_name`),
-ADD INDEX `idx_programming_language` (`programming_language`);
+ADD INDEX `idx_programming_language` (`programming_language`),
+ADD INDEX `idx_trending_period` (`trending_period`);
 
 -- 3. 翻译缓存表 - 避免重复翻译，提升性能
 CREATE TABLE IF NOT EXISTS `translation_cache` (

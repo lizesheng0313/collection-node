@@ -50,4 +50,4 @@ class AuthController extends Controller {
   }
 }
 
-module.exports = AuthController; 
+module.exports = AuthController;

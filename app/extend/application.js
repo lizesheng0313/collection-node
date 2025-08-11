@@ -5,11 +5,11 @@ const fs = require('fs');
 function loadMappers() {
   const mappers = {};
   const mappersPath = path.join(__dirname, '../mapper');
-  
+
   // 检查目录是否存在
   if (fs.existsSync(mappersPath)) {
     const files = fs.readdirSync(mappersPath);
-    
+
     for (const file of files) {
       if (file.endsWith('.js')) {
         const name = path.basename(file, '.js');
@@ -17,7 +17,7 @@ function loadMappers() {
       }
     }
   }
-  
+
   return mappers;
 }
 
@@ -34,23 +34,7 @@ module.exports = {
    * 应用启动完成后的初始化
    */
   async didReady() {
-    // 启动爬虫服务
-    try {
-      this.logger.info('🚀 Application ready, starting crawler...');
-
-      // 延迟5秒启动爬虫，确保所有服务都已初始化
-      setTimeout(async () => {
-        try {
-          const ctx = this.createAnonymousContext();
-          await ctx.service.crawler.startCrawler();
-        } catch (error) {
-          this.logger.error('Failed to start crawler:', error);
-        }
-      }, 5000);
-
-    } catch (error) {
-      this.logger.error('Failed to initialize crawler:', error);
-    }
+    this.logger.info('🚀 Application ready! Scheduled tasks will handle crawling.');
   },
 
   /**
@@ -63,9 +47,12 @@ module.exports = {
 
   /**
    * 手动触发爬取
+   * @param period
+   * @param language
+   * @param limit
    */
   async triggerCrawl(period = 'daily', language = null, limit = 50) {
     const ctx = this.createAnonymousContext();
     return await ctx.service.crawler.manualCrawl(period, language, limit);
-  }
+  },
 };

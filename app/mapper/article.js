@@ -8,7 +8,7 @@ module.exports = {
     SET read_count = read_count + 1 
     WHERE id = ?
   `,
-  
+
   // 按状态统计文章数量
   countByStatus: `
     SELECT 
@@ -17,7 +17,7 @@ module.exports = {
     FROM articles 
     GROUP BY status
   `,
-  
+
   // 获取指定来源的文章列表
   findBySource: `
     SELECT 
@@ -34,7 +34,7 @@ module.exports = {
     ORDER BY collect_time DESC 
     LIMIT ?, ?
   `,
-  
+
   // 按时间段获取文章
   findByDateRange: `
     SELECT 
@@ -50,7 +50,7 @@ module.exports = {
     WHERE collect_time BETWEEN ? AND ? 
     ORDER BY collect_time DESC
   `,
-  
+
   // 获取热门文章
   findHotArticles: `
     SELECT 
@@ -63,7 +63,7 @@ module.exports = {
     ORDER BY read_count DESC 
     LIMIT ?
   `,
-  
+
   // 搜索文章
   searchArticles: `
     SELECT 
@@ -79,4 +79,4 @@ module.exports = {
     ORDER BY publish_time DESC 
     LIMIT ?, ?
   `,
-}; 
+};

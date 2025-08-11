@@ -99,10 +99,10 @@ class UserService extends Service {
         avatar: user.avatar || '',
         nickname: user.nickname || user.username,
         email: user.email || '',
-        roles: user.roles ? user.roles.split(',') : ['user'],
+        roles: user.roles ? user.roles.split(',') : [ 'user' ],
       },
     };
   }
 }
 
-module.exports = UserService; 
+module.exports = UserService;

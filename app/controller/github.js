@@ -11,7 +11,7 @@ class GitHubController extends Controller {
 
     try {
       // 参数验证
-      if (!['daily', 'weekly', 'monthly'].includes(period)) {
+      if (![ 'daily', 'weekly', 'monthly' ].includes(period)) {
         ctx.body = {
           success: false,
           message: 'Invalid period. Must be daily, weekly, or monthly.',
@@ -82,7 +82,7 @@ class GitHubController extends Controller {
         return;
       }
 
-      if (!['stars', 'forks', 'updated'].includes(sort)) {
+      if (![ 'stars', 'forks', 'updated' ].includes(sort)) {
         ctx.body = {
           success: false,
           message: 'Invalid sort parameter. Must be stars, forks, or updated.',
@@ -91,7 +91,7 @@ class GitHubController extends Controller {
         return;
       }
 
-      if (!['asc', 'desc'].includes(order)) {
+      if (![ 'asc', 'desc' ].includes(order)) {
         ctx.body = {
           success: false,
           message: 'Invalid order parameter. Must be asc or desc.',
@@ -205,6 +205,36 @@ class GitHubController extends Controller {
         success: false,
         message: 'Failed to get search suggestions',
         error: error.message,
+      };
+      ctx.status = 500;
+    }
+  }
+
+  /**
+   * 测试爬虫功能
+   * GET /api/github/test-crawl
+   */
+  async testCrawl() {
+    const { ctx } = this;
+    const { owner = 'microsoft', repo = 'vscode' } = ctx.query;
+
+    try {
+      this.logger.info(`🧪 Testing crawl for ${owner}/${repo}`);
+
+      // 测试爬取一个项目
+      const repoData = await ctx.service.github.getRepositoryDetails(owner, repo);
+
+      ctx.body = {
+        success: true,
+        data: repoData,
+        message: `Successfully crawled ${owner}/${repo}`,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Test crawl failed for ${owner}/${repo}:`, error);
+      ctx.body = {
+        success: false,
+        error: error.message,
+        message: `Failed to crawl ${owner}/${repo}`,
       };
       ctx.status = 500;
     }
