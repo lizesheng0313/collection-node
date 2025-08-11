@@ -37,51 +37,53 @@ class StarRankService extends Service {
           // 翻译描述
           if (repo.description && !repo.description_cn) {
             this.logger.info(`开始翻译：${repo.description.slice(0, 50)}${repo.description.length > 50 ? '...' : ''}`);
-            const cached = await this.getCachedTranslation(repo.description);
-            if (cached) {
-              repo.description_cn = cached;
-              this.logger.debug('翻译命中缓存');
-            } else {
-              const translated = await this.service.ai.translateToChinese(repo.description, repo);
-              repo.description_cn = translated;
-              await this.saveCachedTranslation(repo.description, translated);
-            }
+            const translated = await this.service.ai.translateToChinese(repo.description, repo);
+            repo.description_cn = translated;
           }
 
           // 生成项目介绍
-          const cacheKey = `project_intro_${repo.full_name.replace('/', '_')}`;
-          const cached = await this.getCachedTranslation(cacheKey);
-          if (cached) {
-            repo.project_intro = cached;
-          } else {
-            const projectIntro = await this.service.ai.generateProjectIntro(repo);
-            repo.project_intro = projectIntro;
-            await this.saveCachedTranslation(cacheKey, projectIntro);
-          }
+          const projectIntro = await this.service.ai.generateProjectIntro(repo);
+          repo.project_intro = projectIntro;
 
           // 分析并保存
           this.logger.info(`开始分析：${repo.full_name}`);
 
           try {
             const analysis = await this.service.ai.analyzeBusinessValue(repo);
-            if (analysis && analysis.overall_score) {
-              try {
-                const repoId = await this.saveRepository(repo, analysis, period);
-                repo.db_id = repoId;
-                this.logger.info(`入库完成：ID=${repoId}，评分=${analysis.overall_score}`);
-                processedRepos.push(repo);
-              } catch (error) {
-                this.logger.error(`❌ 入库失败：${repo.full_name}`, error);
-              }
-            } else {
-              this.logger.warn(`❌ 分析失败：${repo.full_name}，跳过入库`);
+
+            // 严格检查：必须有完整的商业分析字段
+            if (!analysis || !analysis.overall_score) {
+              throw new Error('AI分析返回空结果或缺少评分');
+            }
+
+            // 检查是否有完整的商业分析字段
+            const hasCompleteAnalysis = analysis.money_making_ideas || analysis.target_customers || analysis.problem_solved;
+            if (!hasCompleteAnalysis) {
+              throw new Error('AI分析缺少关键商业分析字段（money_making_ideas, target_customers, problem_solved）');
+            }
+
+            try {
+              const repoId = await this.saveRepository(repo, analysis, period);
+              repo.db_id = repoId;
+              this.logger.info(`✅ 入库完成：ID=${repoId}，评分=${analysis.overall_score}，完整分析`);
+              processedRepos.push(repo);
+            } catch (saveError) {
+              this.logger.error(`❌ 入库失败：${repo.full_name}，原因：${saveError.message}`);
+              throw saveError;
             }
           } catch (analysisError) {
-            this.logger.error(`❌ 分析异常：${repo.full_name}，原因：${analysisError.message}`);
+            this.logger.error(`❌ 商业分析失败：${repo.full_name}`);
+            this.logger.error(`   错误类型：${analysisError.name || 'Unknown'}`);
+            this.logger.error(`   错误信息：${analysisError.message}`);
+            this.logger.error(`   项目描述：${repo.description || '无描述'}`);
+            this.logger.error(`   项目语言：${repo.language || '未知'}`);
+            this.logger.error(`   项目标签：${(repo.topics || []).join(', ') || '无标签'}`);
+            // 不入库，继续处理下一个项目
           }
         } catch (error) {
           this.logger.warn(`处理仓库出错：${repo.full_name}`, error);
-          processedRepos.push(repo);
+          // 移除这行，避免错误的项目也被添加到结果中
+          // processedRepos.push(repo);
         }
       }
 
@@ -117,25 +119,12 @@ class StarRankService extends Service {
       const repoData = await this.service.github.getRepositoryDetails(owner, repo);
       // 翻译项目描述
       if (repoData.description && !repoData.description_cn) {
-        const cached = await this.getCachedTranslation(repoData.description);
-        if (cached) {
-          repoData.description_cn = cached;
-        } else {
-          const translated = await this.service.ai.translateToChinese(repoData.description);
-          repoData.description_cn = translated;
-          await this.saveCachedTranslation(repoData.description, translated);
-        }
+        const translated = await this.service.ai.translateToChinese(repoData.description);
+        repoData.description_cn = translated;
       }
       // 生成项目介绍
-      const cacheKey = `project_intro_${owner}_${repo}`;
-      const cached = await this.getCachedTranslation(cacheKey);
-      if (cached) {
-        repoData.project_intro = cached;
-      } else {
-        const projectIntro = await this.service.ai.generateProjectIntro(repoData);
-        repoData.project_intro = projectIntro;
-        await this.saveCachedTranslation(cacheKey, projectIntro);
-      }
+      const projectIntro = await this.service.ai.generateProjectIntro(repoData);
+      repoData.project_intro = projectIntro;
       // 商业价值分析
       const analysis = await this.service.ai.analyzeBusinessValue(repoData);
       if (!analysis || !analysis.overall_score) {
@@ -180,18 +169,12 @@ class StarRankService extends Service {
         for (const repo of githubResults) {
           // 翻译描述
           if (repo.description && !repo.description_cn) {
-            const cached = await this.getCachedTranslation(repo.description);
-            if (cached) {
-              repo.description_cn = cached;
-            } else {
-              try {
-                const translated = await this.service.ai.translateToChinese(repo.description);
-                repo.description_cn = translated;
-                await this.saveCachedTranslation(repo.description, translated);
-              } catch (error) {
-                this.logger.warn(`Translation failed for ${repo.full_name}:`, error);
-                repo.description_cn = repo.description;
-              }
+            try {
+              const translated = await this.service.ai.translateToChinese(repo.description);
+              repo.description_cn = translated;
+            } catch (error) {
+              this.logger.warn(`Translation failed for ${repo.full_name}:`, error);
+              repo.description_cn = repo.description;
             }
           }
 

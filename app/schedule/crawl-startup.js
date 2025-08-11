@@ -17,13 +17,15 @@ class CrawlStartup extends Subscription {
       const tasks = [
         { period: 'daily', limit: 50 },
         { period: 'weekly', limit: 100 },
+        { period: 'monthly', limit: 200 },
       ];
 
       for (let i = 0; i < tasks.length; i++) {
         const { period, limit } = tasks[i];
-        ctx.logger.info(`▶️ 开始：${period === 'daily' ? '按天' : '按周'}（${limit}）`);
+        const periodName = period === 'daily' ? '按天' : period === 'weekly' ? '按周' : '按月';
+        ctx.logger.info(`▶️ 开始：${periodName}（${limit}）`);
         const newCount = await ctx.service.crawler.crawlByLanguage(period, null, limit);
-        ctx.logger.info(`✅ 完成：${period === 'daily' ? '按天' : '按周'} 新增 ${newCount || 0} 条`);
+        ctx.logger.info(`✅ 完成：${periodName} 新增 ${newCount || 0} 条`);
         if (i < tasks.length - 1) {
           ctx.logger.info('⏸ 暂停 2 秒...');
           await new Promise(resolve => setTimeout(resolve, 2000));

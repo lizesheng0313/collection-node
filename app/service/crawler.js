@@ -20,7 +20,7 @@ class CrawlerService extends Service {
     this.logger.info('▶️ 开始全量爬取（按周期）');
 
     try {
-      const periods = ['daily', 'weekly'];
+      const periods = [ 'daily', 'weekly' ];
       for (const period of periods) {
         const limit = this.getLimitByPeriod(period);
         this.logger.info(`📌 开始爬取「${period === 'daily' ? '天' : '周'}」的 ${limit} 个任务`);

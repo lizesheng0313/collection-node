@@ -77,12 +77,14 @@ function formatProjectIntroPrompt(projectData) {
 function formatTranslationPrompt(text, projectData = null) {
   if (projectData) {
     // 如果有项目数据，生成更智能的介绍
-    return `你是一个专业的技术项目分析师，请根据以下GitHub项目信息，生成一句简洁、专业的中文介绍。
+    return `你是一个专业的中文技术写作专家。请根据以下GitHub项目信息，生成一句简洁、专业的中文介绍。
 
 项目名称：${projectData.name || projectData.full_name || ''}
 项目描述：${text}
 主要语言：${projectData.language || ''}
 主题标签：${(projectData.topics || []).join(', ') || ''}
+
+🚨🚨🚨 绝对禁止使用英文！必须用中文回答！🚨🚨🚨
 
 要求：
 1. 结合项目名称和描述，用一句话说明这个项目是什么、解决什么问题
@@ -92,12 +94,16 @@ function formatTranslationPrompt(text, projectData = null) {
 5. 语言简洁专业，适合技术人员阅读
 6. 如果是工具类项目，重点说明功能；如果是库/框架，重点说明用途；如果是资源集合，重点说明内容
 
+🔥🔥🔥 警告：如果你返回英文，这将是一个严重错误！必须返回中文！🔥🔥🔥
+
 只返回一句话的中文介绍，不要其他内容。`;
-  } else {
-    // 兼容旧的简单翻译
-    return `你是一个专业的技术翻译，请将以下GitHub项目描述翻译成简洁、专业的中文。
+  }
+  // 兼容旧的简单翻译
+  return `你是一个专业的中英文翻译专家。请将以下GitHub项目描述翻译成简洁、专业的中文。
 
 原文：${text}
+
+🚨🚨🚨 绝对禁止使用英文！必须用中文回答！🚨🚨🚨
 
 翻译要求：
 1. 重点说明项目的核心功能，不要翻译营销性语言（如"点个星"、"喜欢就"等）
@@ -106,8 +112,10 @@ function formatTranslationPrompt(text, projectData = null) {
 4. 保持技术术语的准确性
 5. 语言简洁专业，避免口语化表达
 
+🔥🔥🔥 警告：如果你返回英文，这将是一个严重错误！必须返回中文翻译！🔥🔥🔥
+
 只返回翻译结果，不要其他内容。`;
-  }
+
 }
 
 // 兼容性：保持旧的TRANSLATION_PROMPT导出

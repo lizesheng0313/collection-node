@@ -1,7 +1,7 @@
 const { Service } = require('egg');
 const jaison = require('jaison');
 const { formatTranslationPrompt, formatProjectIntroPrompt } = require('../config/prompts/translation');
-const { formatBusinessAnalysisPrompt, calculateBasicScore } = require('../config/prompts/business-analysis');
+const { formatBusinessAnalysisPrompt } = require('../config/prompts/business-analysis');
 
 class AIService extends Service {
   constructor(ctx) {
@@ -34,8 +34,8 @@ class AIService extends Service {
       this.logger.debug(`已生成项目介绍: ${projectData.name || 'unknown'}`);
       return intro;
     } catch (error) {
-      this.logger.warn('生成项目介绍失败，回退到基础介绍', error.message);
-      return this.generateBasicIntro(projectData);
+      this.logger.error('生成项目介绍失败', error.message);
+      throw new Error(`项目介绍生成失败: ${error.message}`);
     }
   }
 
@@ -61,7 +61,7 @@ class AIService extends Service {
     try {
       // 第一次：严格要求仅返回 JSON
       const basePrompt = formatBusinessAnalysisPrompt(repoData);
-      const strictInstruction = `\n\n请仅返回严格的 JSON（UTF-8），不要包含任何解释、Markdown、反引号、前后缀或多余文本。`;
+      const strictInstruction = '\n\n请仅返回严格的 JSON（UTF-8），不要包含任何解释、Markdown、反引号、前后缀或多余文本。';
       const prompt1 = `${basePrompt}${strictInstruction}`;
 
       const response1 = await this.callAIModel(prompt1, { forceJson: true });
@@ -94,21 +94,46 @@ class AIService extends Service {
         return parsed2;
       }
 
-      // 仍失败，告警一次并回退
-      this.logger.warn('AI 响应JSON解析失败（重试后仍失败），回退到基础分析');
-      return this.generateBasicAnalysis(repoData, response2 || response1);
+      // 仍失败，直接抛出错误，不回退
+      this.logger.error('AI 响应JSON解析失败（重试后仍失败）');
+      this.logger.error('AI响应1:', response1 ? response1.substring(0, 500) : 'null');
+      this.logger.error('AI响应2:', response2 ? response2.substring(0, 500) : 'null');
+      throw new Error('AI商业分析失败：无法解析JSON响应，重试后仍失败');
     } catch (error) {
-      this.logger.warn('商业分析失败，回退到基础分析', error.message);
-      return this.generateBasicAnalysis(repoData);
+      this.logger.error('商业分析失败，详细错误:', error.message);
+      this.logger.error('错误堆栈:', error.stack);
+      throw new Error(`AI商业分析失败: ${error.message}`);
     }
   }
 
   async callAIModel(prompt, options = {}) {
     const { api_url, api_key, model } = this.modelConfig;
-    const { forceJson = false } = options;
+    const { forceJson = false, maxRetries = 2 } = options;
     if (!api_url || !api_key || !model) {
       throw new Error('AI 模型配置不完整');
     }
+
+    // 重试逻辑
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      const startTime = Date.now();
+
+      try {
+        return await this._makeAIRequest(prompt, { api_url, api_key, model, forceJson, startTime, attempt });
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries + 1;
+
+        if (isLastAttempt) {
+          throw error;
+        }
+
+        this.logger.warn(`AI调用失败，第${attempt}次重试: ${error.message}`);
+        // 重试前等待 2 秒
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  }
+
+  async _makeAIRequest(prompt, { api_url, api_key, model, forceJson, startTime, attempt }) {
     try {
       // 直接在这里构建 payload
       let payload;
@@ -149,12 +174,42 @@ class AIService extends Service {
         timeout: 120000,
       });
       if (response.status !== 200) {
-        throw new Error(`AI 接口错误: ${response.status}`);
+        this.logger.error(`AI 接口HTTP错误: ${response.status}`);
+        this.logger.error('响应内容:', response.data);
+        throw new Error(`AI 接口HTTP错误: ${response.status}`);
       }
-      return this.parseResponse(response.data);
+
+      const result = this.parseResponse(response.data);
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      if (duration > 30000) {
+        this.logger.warn(`AI调用耗时过长: ${duration}ms, 模型: ${model}, 尝试次数: ${attempt}`);
+      } else {
+        this.logger.debug(`AI调用成功: ${duration}ms, 模型: ${model}, 尝试次数: ${attempt}`);
+      }
+
+      return result;
     } catch (error) {
-      this.logger.error('AI 接口调用失败：', error);
-      throw error;
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      this.logger.error('AI 接口调用失败：');
+      this.logger.error(`  模型: ${model}`);
+      this.logger.error(`  API地址: ${api_url}`);
+      this.logger.error(`  耗时: ${duration}ms`);
+      this.logger.error(`  错误类型: ${error.name || 'Unknown'}`);
+      this.logger.error(`  错误信息: ${error.message}`);
+
+      if (error.code) {
+        this.logger.error(`  错误代码: ${error.code}`);
+      }
+
+      if (error.status) {
+        this.logger.error(`  HTTP状态: ${error.status}`);
+      }
+
+      throw new Error(`AI接口调用失败: ${error.message}`);
     }
   }
 
@@ -175,7 +230,7 @@ class AIService extends Service {
     const hitCrack = /crack|license key|serial|activation|破解|授权码|注册码|激活码|补丁/.test(text) || /破解|授权码|注册码|激活码|补丁/.test(cnText);
     const pureTech = /sdk|framework|lib|library|driver|algorithm|算法|内核|驱动|编译器|协议|规范|中间件/.test(text + cnText);
 
-    let result = { ...analysis };
+    const result = { ...analysis };
     let score = Number(result.overall_score) || 0;
 
     if (hitCrack) {
@@ -203,38 +258,7 @@ class AIService extends Service {
     }
   }
 
-  generateBasicAnalysis(repoData, aiResponse = '') {
-    const scores = calculateBasicScore(repoData);
-    const { stars_count = 0, forks_count = 0 } = repoData;
-
-    return {
-      overall_score: scores.overall_score,
-      analysis: {
-        technical_value: {
-          score: scores.tech_score,
-          description: `基于${repoData.language || '未知'}语言和项目主题的技术评估`,
-        },
-        market_potential: {
-          score: scores.market_score,
-          description: `基于${stars_count}个star和${forks_count}个fork的市场热度评估`,
-        },
-        business_model: {
-          score: 6,
-          description: '需要进一步分析具体的商业模式',
-        },
-        risk_assessment: {
-          score: 7,
-          description: '开源项目的常规风险评估',
-        },
-        investment_value: {
-          score: Math.round(scores.overall_score),
-          description: '基于综合指标的投资价值评估',
-        },
-      },
-      summary: `该项目在GitHub上有${stars_count}个star，显示出一定的技术价值和市场关注度。${aiResponse ? aiResponse.substring(0, 200) : ''}`,
-      raw_ai_response: aiResponse || null,
-    };
-  }
+  // generateBasicAnalysis 方法已删除 - 不再使用回退逻辑
 
   // 已内联 payload/headers 构建，删除辅助方法
 }

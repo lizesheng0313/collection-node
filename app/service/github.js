@@ -25,7 +25,9 @@ class GitHubService extends Service {
    * @return {Promise<Array>} 项目列表
    */
   async getTrendingRepositories(options = {}) {
-    const { period = 'daily', language, page = 1, limit = 25 } = options;
+    const { period = 'daily', language, limit = 25 } = options;
+
+    // 直接使用网页爬取，不使用 GitHub Search API
 
     try {
       // 构建GitHub Trending URL
@@ -466,21 +468,36 @@ class GitHubService extends Service {
     const repositories = [];
 
     try {
-      // 使用正则表达式提取项目信息
-      // GitHub Trending页面的项目链接格式: /owner/repo
-      const repoRegex = /<h2[^>]*class="[^"]*h3[^"]*"[^>]*>[\s\S]*?<a[^>]*href="\/([^\/]+\/[^"]+)"[^>]*>/g;
-      const starRegex = /<span[^>]*class="[^"]*Counter[^"]*"[^>]*>\s*([0-9,]+)\s*<\/span>/g;
+      // 查找所有href="/owner/repo"格式的链接
+      const allRepoLinks = [];
+      const repoLinkRegex = /<a[^>]*href="\/([^\/\s"]+\/[^\/\s"]+)"[^>]*>/g;
+      let linkMatch;
 
-      let match;
-      let starMatch;
+      while ((linkMatch = repoLinkRegex.exec(html)) !== null) {
+        const fullName = linkMatch[1];
+        allRepoLinks.push(fullName);
+      }
+
+      // 过滤出真正的trending项目链接
+      const trendingProjects = allRepoLinks.filter(link => {
+        return !link.startsWith('orgs/') && !link.startsWith('users/') &&
+               !link.startsWith('solutions/') && !link.startsWith('resources/') &&
+               !link.startsWith('sponsors/') && !link.startsWith('trending/') &&
+               !link.startsWith('apps/') && !link.includes('?') && !link.includes('#') &&
+               link.split('/').length === 2 &&
+               link.split('/')[0].length > 0 &&
+               link.split('/')[1].length > 0;
+      });
+
+      // 去重并创建项目对象
+      const seenRepos = new Set();
       let index = 0;
 
-      // 提取项目名称
-      while ((match = repoRegex.exec(html)) !== null && index < 25) {
-        const fullName = match[1];
-        const [ owner, name ] = fullName.split('/');
+      trendingProjects.forEach(fullName => {
+        if (!seenRepos.has(fullName)) {
+          seenRepos.add(fullName);
+          const [ owner, name ] = fullName.split('/');
 
-        if (owner && name) {
           repositories.push({
             id: Date.now() + index, // 临时ID
             full_name: fullName,
@@ -506,7 +523,7 @@ class GitHubService extends Service {
           });
           index++;
         }
-      }
+      });
 
       this.logger.info(`已解析 ${repositories.length} 个项目（GitHub 趋势）`);
 
@@ -515,6 +532,86 @@ class GitHubService extends Service {
     }
 
     return repositories;
+  }
+
+  // 多语言爬取方法已删除 - 保持简单
+
+  /**
+   * 通过网页爬取获取趋势项目（原方法重命名）
+   * @param {Object} options - 选项
+   * @return {Array} 项目列表
+   */
+  async getTrendingRepositoriesViaWeb(options = {}) {
+    const { period = 'daily', language, limit = 25 } = options;
+
+    try {
+      // 构建GitHub Trending URL
+      let trendingUrl = 'https://github.com/trending';
+
+      if (language) {
+        trendingUrl += `/${language}`;
+      }
+
+      // 添加时间周期参数
+      const params = new URLSearchParams();
+      if (period && period !== 'daily') {
+        params.append('since', period);
+      }
+
+      if (params.toString()) {
+        trendingUrl += `?${params.toString()}`;
+      }
+
+      this.logger.info(`开始抓取 GitHub 趋势页面: ${trendingUrl}`);
+
+      // 爬取GitHub Trending页面
+      const response = await this.ctx.curl(trendingUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          Connection: 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        timeout: 30000,
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`GitHub Trending page error: ${response.status}`);
+      }
+
+      // 解析HTML页面，提取项目信息
+      const repositories = this.parseTrendingPage(response.data.toString());
+
+      // 限制返回数量
+      const limitedRepos = repositories.slice(0, limit);
+
+      // 获取每个项目的详细信息
+      const detailedRepos = [];
+      for (const repo of limitedRepos) {
+        try {
+          const [ owner, name ] = repo.full_name.split('/');
+          const detailRepo = await this.getRepositoryDetails(owner, name);
+          if (detailRepo) {
+            detailedRepos.push(detailRepo);
+          } else {
+            detailedRepos.push(repo);
+          }
+          await this.sleep(200);
+        } catch (error) {
+          this.logger.warn(`Failed to get details for ${repo.full_name}:`, error.message);
+          detailedRepos.push(repo);
+        }
+      }
+
+      return detailedRepos;
+
+    } catch (error) {
+      this.logger.error('Failed to fetch trending repositories via web:', error);
+      throw error;
+    }
   }
 
   /**
