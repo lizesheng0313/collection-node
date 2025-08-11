@@ -71,10 +71,31 @@ function formatProjectIntroPrompt(projectData) {
 /**
  * 格式化简单翻译提示词（兼容旧接口）
  * @param {string} text - 要翻译的文本
+ * @param {Object} projectData - 项目数据（可选）
  * @return {string} 格式化后的提示词
  */
-function formatTranslationPrompt(text) {
-  return `你是一个专业的技术翻译，请将以下GitHub项目描述翻译成简洁、专业的中文。
+function formatTranslationPrompt(text, projectData = null) {
+  if (projectData) {
+    // 如果有项目数据，生成更智能的介绍
+    return `你是一个专业的技术项目分析师，请根据以下GitHub项目信息，生成一句简洁、专业的中文介绍。
+
+项目名称：${projectData.name || projectData.full_name || ''}
+项目描述：${text}
+主要语言：${projectData.language || ''}
+主题标签：${(projectData.topics || []).join(', ') || ''}
+
+要求：
+1. 结合项目名称和描述，用一句话说明这个项目是什么、解决什么问题
+2. 不要简单的逐字翻译，而是要理解项目的本质功能
+3. 去掉营销性语言和emoji符号
+4. 保持技术术语的准确性
+5. 语言简洁专业，适合技术人员阅读
+6. 如果是工具类项目，重点说明功能；如果是库/框架，重点说明用途；如果是资源集合，重点说明内容
+
+只返回一句话的中文介绍，不要其他内容。`;
+  } else {
+    // 兼容旧的简单翻译
+    return `你是一个专业的技术翻译，请将以下GitHub项目描述翻译成简洁、专业的中文。
 
 原文：${text}
 
@@ -86,6 +107,7 @@ function formatTranslationPrompt(text) {
 5. 语言简洁专业，避免口语化表达
 
 只返回翻译结果，不要其他内容。`;
+  }
 }
 
 // 兼容性：保持旧的TRANSLATION_PROMPT导出

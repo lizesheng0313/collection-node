@@ -311,7 +311,15 @@ class ArticleService extends Service {
         article.topics = article.topics.split(',').map(t => t.trim()).filter(t => t);
       }
 
-      // 暂时跳过business_analysis字段解析
+      // 解析business_analysis字段
+      if (article.business_analysis && typeof article.business_analysis === 'string') {
+        try {
+          article.business_analysis = JSON.parse(article.business_analysis);
+        } catch (e) {
+          // 如果解析失败，保持原始字符串
+          console.warn('Failed to parse business_analysis JSON:', e);
+        }
+      }
 
       // 添加GitHub信息便捷访问
       article.github_info = {

@@ -42,7 +42,7 @@ class StarRankService extends Service {
               repo.description_cn = cached;
               this.logger.debug('翻译命中缓存');
             } else {
-              const translated = await this.service.ai.translateToChinese(repo.description);
+              const translated = await this.service.ai.translateToChinese(repo.description, repo);
               repo.description_cn = translated;
               await this.saveCachedTranslation(repo.description, translated);
             }

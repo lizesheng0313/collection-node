@@ -11,10 +11,10 @@ class AIService extends Service {
     this.modelConfig = this.aiConfig.models?.[this.currentModel] || {};
   }
 
-  async translateToChinese(text) {
+  async translateToChinese(text, projectData = null) {
     if (!text || !text.trim()) return text;
     try {
-      const prompt = formatTranslationPrompt(text);
+      const prompt = formatTranslationPrompt(text, projectData);
       const response = await this.callAIModel(prompt);
       const translated = response.trim();
       this.logger.debug(`翻译完成: ${text.substring(0, 30)} -> ${translated.substring(0, 30)}`);
