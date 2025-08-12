@@ -18,49 +18,49 @@ module.exports = {
     GROUP BY status
   `,
 
-  // 获取指定来源的文章列表
-  findBySource: `
-    SELECT 
-      id, 
-      title, 
-      source,
-      collect_time, 
-      update_time, 
-      read_count, 
-      status, 
-      publish_time 
-    FROM articles 
-    WHERE source = ? 
-    ORDER BY collect_time DESC 
+  // 获取指定类型的文章列表
+  findByType: `
+    SELECT
+      id,
+      title,
+      article_type,
+      collect_time,
+      update_time,
+      read_count,
+      status,
+      publish_time
+    FROM articles
+    WHERE article_type = ?
+    ORDER BY collect_time DESC
     LIMIT ?, ?
   `,
 
   // 按时间段获取文章
   findByDateRange: `
-    SELECT 
-      id, 
-      title, 
-      source, 
-      collect_time, 
-      update_time, 
-      read_count, 
-      status, 
-      publish_time 
-    FROM articles 
-    WHERE collect_time BETWEEN ? AND ? 
+    SELECT
+      id,
+      title,
+      article_type,
+      collect_time,
+      update_time,
+      read_count,
+      status,
+      publish_time
+    FROM articles
+    WHERE collect_time BETWEEN ? AND ?
     ORDER BY collect_time DESC
   `,
 
   // 获取热门文章
   findHotArticles: `
-    SELECT 
-      id, 
-      title, 
-      source, 
-      read_count 
-    FROM articles 
-    WHERE status = 'published' 
-    ORDER BY read_count DESC 
+    SELECT
+      id,
+      title,
+      article_type,
+      read_count
+    FROM articles
+    WHERE status = 'published'
+    ORDER BY read_count DESC
     LIMIT ?
   `,
 

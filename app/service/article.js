@@ -17,7 +17,6 @@ class ArticleService extends Service {
     // 如果是GitHub项目类型，设置特殊的标题格式
     if (article.article_type === 'github_project' && article.github_full_name) {
       article.title = article.title || `GitHub项目: ${article.github_full_name}`;
-      article.source = article.source || 'GitHub';
     }
 
     const result = await this.app.mysql.insert('articles', article);
@@ -38,7 +37,6 @@ class ArticleService extends Service {
     const article = {
       article_type: 'github_project',
       title: `GitHub项目: ${repoData.full_name}`,
-      source: 'GitHub',
       content: this.generateGitHubProjectContent(repoData, analysisData),
 
       // GitHub核心字段（id 可能为空，保留数值列语义；用 url 去重）
