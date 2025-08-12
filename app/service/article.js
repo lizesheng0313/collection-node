@@ -291,9 +291,6 @@ class ArticleService extends Service {
       }
     }
 
-    content += '---\n\n';
-    content += '*本文由AI自动生成和分析*';
-
     return content;
   }
 
