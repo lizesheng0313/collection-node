@@ -96,6 +96,11 @@ class StarRankService extends Service {
             limit: parseInt(limit),
             total: processedRepos.length,
           },
+          stats: {
+            totalFetched: repositories.length,
+            newProcessed: processedRepos.length,
+            skipped: repositories.length - processedRepos.length,
+          },
           period,
           language,
         },

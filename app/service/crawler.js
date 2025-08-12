@@ -49,16 +49,13 @@ class CrawlerService extends Service {
       this.logger.info(`开始爬取${period === 'daily' ? '天' : '周'}的 ${limit}个任务`);
       const result = await this.service.starrank.getTrendingWithTranslation(options);
 
-      if (result.success && result.data.repositories) {
-        const repos = result.data.repositories;
-        let newCount = 0;
-        for (const repo of repos) {
-          if (this.crawlHistory.has(repo.id)) continue;
-          this.crawlHistory.add(repo.id);
-          newCount++;
-        }
-        this.logger.info(`✅ 完成（${period === 'daily' ? '按天' : '按周'}）：共 ${repos.length} 条，新入库 ${newCount} 条`);
-        return newCount;
+      if (result.success && result.data) {
+        const stats = result.data.stats || {};
+        const totalFetched = stats.totalFetched || 0;
+        const newProcessed = stats.newProcessed || 0;
+
+        this.logger.info(`✅ 完成（${period === 'daily' ? '按天' : '按周'}）：共 ${totalFetched} 条，新入库 ${newProcessed} 条`);
+        return newProcessed;
       }
     } catch (error) {
       this.logger.error(`爬取失败：${period} ${language || '全部'}`, error.message);

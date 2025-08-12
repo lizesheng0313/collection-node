@@ -49,8 +49,8 @@ class GitHubService extends Service {
 
       this.logger.info(`开始抓取 GitHub 趋势页面: ${trendingUrl}`);
 
-      // 爬取GitHub Trending页面
-      const response = await this.ctx.curl(trendingUrl, {
+      // 爬取GitHub Trending页面（带重试）
+      const response = await this.requestWithRetry(trendingUrl, {
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -113,7 +113,7 @@ class GitHubService extends Service {
       const url = `https://github.com/${owner}/${repo}`;
       this.logger.debug(`抓取仓库页面: ${url}`);
 
-      const response = await this.ctx.curl(url, {
+      const response = await this.requestWithRetry(url, {
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -302,13 +302,13 @@ class GitHubService extends Service {
       // 尝试获取README.md
       const readmeUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
 
-      const response = await this.ctx.curl(readmeUrl, {
+      const response = await this.requestWithRetry(readmeUrl, {
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         },
         timeout: 15000,
-      });
+      }, 2, 1000); // 2次重试，1秒延迟
 
       if (response.status === 200) {
         return response.data.toString();
@@ -316,13 +316,13 @@ class GitHubService extends Service {
 
       // 如果main分支没有，尝试master分支
       const masterReadmeUrl = `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`;
-      const masterResponse = await this.ctx.curl(masterReadmeUrl, {
+      const masterResponse = await this.requestWithRetry(masterReadmeUrl, {
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         },
         timeout: 15000,
-      });
+      }, 2, 1000);
 
       if (masterResponse.status === 200) {
         return masterResponse.data.toString();
@@ -724,6 +724,37 @@ class GitHubService extends Service {
     };
 
     return defaultImages[language] || 'https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/github/github.png';
+  }
+
+  /**
+   * 带重试的网络请求
+   * @param {string} url - 请求URL
+   * @param {Object} options - 请求选项
+   * @param {number} maxRetries - 最大重试次数
+   * @param {number} retryDelay - 重试延迟（毫秒）
+   * @return {Promise<Object>} 响应结果
+   */
+  async requestWithRetry(url, options, maxRetries = 3, retryDelay = 2000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.ctx.curl(url, options);
+        return response;
+      } catch (error) {
+        const isNetworkError = error.code === 'ECONNRESET' ||
+                              error.code === 'ENOTFOUND' ||
+                              error.code === 'ETIMEDOUT' ||
+                              error.message.includes('socket hang up');
+
+        if (isNetworkError && attempt < maxRetries) {
+          this.logger.warn(`网络请求失败，${retryDelay/1000}秒后重试 (${attempt}/${maxRetries}): ${url} - ${error.message}`);
+          await this.sleep(retryDelay);
+          continue;
+        }
+
+        // 最后一次尝试或非网络错误，抛出错误
+        throw error;
+      }
+    }
   }
 
   /**
