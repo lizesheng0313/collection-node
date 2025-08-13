@@ -37,11 +37,6 @@ AI模型已配置为你的自定义模型：
 config.ai = {
   currentModel: 'custom',
   models: {
-    custom: {
-      api_url: 'http://10.0.76.30:30000/v1/chat/completions',
-      api_key: 'sk-TFhyy2kUSgAdk3do4b294b1097Ec4fCe9bD7Ee6a1dD64518',
-      model: 'ds_32b',
-    }
   }
 }
 ```
