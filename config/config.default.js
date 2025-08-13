@@ -16,6 +16,19 @@ module.exports = appInfo => {
   // use for cookie sign key, should change to your own and keep security
   config.keys = appInfo.name + '_1744549122242_7343';
 
+  // 服务器配置
+  config.cluster = {
+    listen: {
+      port: parseInt(process.env.PORT) || 7003,
+      hostname: '127.0.0.1',
+    },
+  };
+
+  // 日志配置
+  config.logger = {
+    dir: process.env.LOG_DIR || './logs',
+  };
+
   // add your middleware config here
   config.middleware = [];
 
