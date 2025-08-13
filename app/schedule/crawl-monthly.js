@@ -4,8 +4,8 @@ class CrawlMonthly extends Subscription {
   // 通过 schedule 属性来设置定时任务的执行间隔等配置
   static get schedule() {
     return {
-      cron: '0 0 8 1 * *', // 每月1号早上8点执行
-      type: 'all', // 指定所有的 worker 都需要执行
+      cron: '0 0 3 * * *', // 每天凌晨3点执行
+      type: 'worker', // 指定单个 worker 执行，避免重复
     };
   }
 
