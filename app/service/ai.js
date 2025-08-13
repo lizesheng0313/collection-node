@@ -171,7 +171,7 @@ class AIService extends Service {
         headers,
         data: payload,
         dataType: 'json',
-        timeout: 120000,
+        timeout: 180000, // 3分钟超时
       });
       if (response.status !== 200) {
         this.logger.error(`AI 接口HTTP错误: ${response.status}`);

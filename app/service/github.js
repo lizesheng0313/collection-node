@@ -307,8 +307,8 @@ class GitHubService extends Service {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         },
-        timeout: 15000,
-      }, 2, 1000); // 2次重试，1秒延迟
+        timeout: 60000, // 60秒超时
+      }, 3, 2000); // 3次重试，2秒延迟
 
       if (response.status === 200) {
         return response.data.toString();
@@ -321,8 +321,8 @@ class GitHubService extends Service {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         },
-        timeout: 15000,
-      }, 2, 1000);
+        timeout: 60000, // 60秒超时
+      }, 3, 2000); // 3次重试，2秒延迟
 
       if (masterResponse.status === 200) {
         return masterResponse.data.toString();

@@ -51,6 +51,8 @@ module.exports = appInfo => {
       password: process.env.DB_PASSWORD || '',
       // 数据库名
       database: process.env.DB_NAME || 'blog',
+      // 字符编码设置 - 支持emoji和4字节UTF-8字符
+      charset: 'utf8mb4',
       // 连接超时时间
       connectTimeout: 60000,
       // 连接池配置
@@ -104,6 +106,25 @@ module.exports = appInfo => {
         api_key: process.env.DEEPSEEK_API_KEY || '',
         model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
       },
+    },
+  };
+
+  // HTTP请求超时配置
+  config.httpclient = {
+    request: {
+      timeout: 60000, // 60秒超时
+    },
+    httpAgent: {
+      timeout: 60000,
+      freeSocketTimeout: 4000,
+      maxSockets: 50,
+      maxFreeSockets: 10,
+    },
+    httpsAgent: {
+      timeout: 60000,
+      freeSocketTimeout: 4000,
+      maxSockets: 50,
+      maxFreeSockets: 10,
     },
   };
 
