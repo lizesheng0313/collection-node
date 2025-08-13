@@ -81,27 +81,12 @@ module.exports = appInfo => {
 
   // AI模型配置
   config.ai = {
-    currentModel: process.env.AI_MODEL || 'deepseek', // 当前使用的AI模型
+    currentModel: 'deepseek', // 当前使用的AI模型
     models: {
       deepseek: {
         api_url: 'https://api.deepseek.com/v1/chat/completions',
         api_key: 'sk-e685248451cf4ce29b633e21894f96f8',
         model: 'deepseek-chat',
-      },
-      custom: {
-        api_url: 'http://10.0.76.30:30000/v1/chat/completions',
-        api_key: 'sk-TFhyy2kUSgAdk3do4b294b1097Ec4fCe9bD7Ee6a1dD64518',
-        model: 'ds_32b',
-      },
-      openai: {
-        api_url: 'https://api.openai.com/v1/chat/completions',
-        api_key: process.env.OPENAI_API_KEY || '',
-        model: 'gpt-3.5-turbo',
-      },
-      claude: {
-        api_url: 'https://api.anthropic.com/v1/messages',
-        api_key: process.env.CLAUDE_API_KEY || '',
-        model: 'claude-3-haiku-20240307',
       },
     },
   };
