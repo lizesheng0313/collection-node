@@ -13,3 +13,6 @@ run/
 *.un~
 typings/
 .nyc_output/
+
+# 环境变量文件 - 包含敏感信息，不应提交到版本控制
+.env

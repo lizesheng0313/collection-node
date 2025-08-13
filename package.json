@@ -7,23 +7,24 @@
     "declarations": true
   },
   "dependencies": {
-    "egg": "^3.17.5",
-    "egg-cors": "^3.0.1",
+    "dotenv": "^16.0.0",
+    "egg": "^2.15.1",
+    "egg-cors": "^2.2.3",
     "egg-jwt": "^3.1.7",
-    "egg-mysql": "^5.0.0",
+    "egg-mysql": "^3.4.0",
     "egg-scripts": "2",
     "jaison": "^2.0.2",
-    "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.6.0"
+    "jsonwebtoken": "^8.5.1",
+    "mysql2": "^2.3.3"
   },
   "devDependencies": {
-    "egg-bin": "6",
-    "egg-mock": "^5.15.1",
-    "eslint": "8",
-    "eslint-config-egg": "13"
+    "egg-bin": "^4.11.0",
+    "egg-mock": "^3.21.0",
+    "eslint": "^6.8.0",
+    "eslint-config-egg": "^7.5.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=16.0.0"
   },
   "scripts": {
     "start": "egg-scripts start --daemon --title=egg-server-collection-node",

@@ -1,5 +1,8 @@
 /* eslint valid-jsdoc: "off" */
 
+// 加载环境变量
+require('dotenv').config();
+
 /**
  * @param {Egg.EggAppInfo} appInfo app info
  */
@@ -26,15 +29,15 @@ module.exports = appInfo => {
     // 单数据库信息配置
     client: {
       // host
-      host: '127.0.0.1',
+      host: process.env.DB_HOST || '127.0.0.1',
       // 端口号
-      port: '3306',
+      port: process.env.DB_PORT || '3306',
       // 用户名
-      user: 'root',
+      user: process.env.DB_USER || 'root',
       // 密码
-      password: '@lizesheng123@',
+      password: process.env.DB_PASSWORD || '',
       // 数据库名
-      database: 'blog',
+      database: process.env.DB_NAME || 'blog',
       // 连接超时时间
       connectTimeout: 60000,
       // 连接池配置
@@ -50,7 +53,7 @@ module.exports = appInfo => {
 
   // JWT配置
   config.jwt = {
-    secret: 'blog-jwt-secret-key', // JWT密钥，实际应用中应使用更复杂的密钥
+    secret: process.env.JWT_SECRET || 'blog-jwt-secret-key', // JWT密钥，实际应用中应使用更复杂的密钥
     expiresIn: '24h', // token过期时间
   };
 
@@ -81,12 +84,12 @@ module.exports = appInfo => {
 
   // AI模型配置
   config.ai = {
-    currentModel: 'deepseek', // 当前使用的AI模型
+    currentModel: process.env.AI_CURRENT_MODEL || 'deepseek', // 当前使用的AI模型
     models: {
       deepseek: {
-        api_url: 'https://api.deepseek.com/v1/chat/completions',
-        api_key: 'sk-e685248451cf4ce29b633e21894f96f8',
-        model: 'deepseek-chat',
+        api_url: process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions',
+        api_key: process.env.DEEPSEEK_API_KEY || '',
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
       },
     },
   };

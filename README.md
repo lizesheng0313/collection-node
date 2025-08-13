@@ -24,26 +24,43 @@
 
 ### 1. 安装依赖
 ```bash
-npm install
+pnpm install
 ```
 
-### 2. 数据库配置
+### 2. 环境变量配置
+复制 `.env.example` 为 `.env` 并配置你的环境变量：
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填入你的配置：
+```bash
+# 数据库配置
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_database_password
+DB_NAME=blog
+
+# JWT配置
+JWT_SECRET=your_jwt_secret_key
+
+# GitHub配置
+GITHUB_TOKEN=your_github_token
+
+# AI模型配置
+AI_CURRENT_MODEL=deepseek
+DEEPSEEK_API_URL=https://api.deepseek.com/v1/chat/completions
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+### 3. 数据库配置
 复制 `sql/1.0.0/github.sql` 中的SQL语句到你的MySQL数据库执行
-
-### 3. 配置文件
-AI模型已配置为你的自定义模型：
-```javascript
-// config/config.default.js 中已配置
-config.ai = {
-  currentModel: 'custom',
-  models: {
-  }
-}
-```
 
 ### 4. 启动服务
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ### 5. 访问测试
