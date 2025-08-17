@@ -29,5 +29,29 @@ CREATE TABLE IF NOT EXISTS `users` (
   UNIQUE KEY `idx_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
+-- 微信用户表
+CREATE TABLE IF NOT EXISTS `user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `openid` varchar(100) NOT NULL COMMENT '微信openid',
+  `unionid` varchar(100) DEFAULT NULL COMMENT '微信unionid',
+  `nickName` varchar(255) DEFAULT NULL COMMENT '昵称',
+  `avatarUrl` varchar(500) DEFAULT NULL COMMENT '头像URL',
+  `source` varchar(20) DEFAULT 'weapp' COMMENT '来源：weapp-小程序',
+  `create_time` bigint(20) DEFAULT NULL COMMENT '创建时间戳',
+  `update_time` bigint(20) DEFAULT NULL COMMENT '更新时间戳',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_openid` (`openid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信用户表';
 
-
+-- 用户收藏表
+CREATE TABLE IF NOT EXISTS `user_favorites` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL COMMENT '用户ID',
+  `article_id` int(11) NOT NULL COMMENT '文章ID',
+  `article_type` varchar(50) DEFAULT 'article' COMMENT '文章类型',
+  `create_time` bigint(20) DEFAULT NULL COMMENT '收藏时间戳',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_user_article` (`user_id`,`article_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_article_id` (`article_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户收藏表';

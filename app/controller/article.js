@@ -291,6 +291,82 @@ class ArticleController extends Controller {
       ctx.status = 500;
     }
   }
+
+  /**
+   * 搜索文章
+   * GET /api/articles/search
+   */
+  async search() {
+    const { ctx } = this;
+    const { keyword, page = 1, pageSize = 10, article_type } = ctx.query;
+
+    if (!keyword || keyword.trim().length === 0) {
+      ctx.body = {
+        success: false,
+        message: '搜索关键词不能为空',
+      };
+      ctx.status = 400;
+      return;
+    }
+
+    try {
+      const offset = (page - 1) * pageSize;
+      let whereClause = `(title LIKE '%${keyword}%' OR content LIKE '%${keyword}%' OR translated_description LIKE '%${keyword}%' OR original_description LIKE '%${keyword}%')`;
+
+      if (article_type && article_type !== 'all') {
+        whereClause += ` AND article_type = '${article_type}'`;
+      }
+
+      whereClause += ` AND status = 'published'`;
+
+      // 查询搜索结果
+      const sql = `
+        SELECT *
+        FROM articles
+        WHERE ${whereClause}
+        ORDER BY
+          CASE
+            WHEN title LIKE '%${keyword}%' THEN 1
+            WHEN translated_description LIKE '%${keyword}%' THEN 2
+            WHEN original_description LIKE '%${keyword}%' THEN 3
+            ELSE 4
+          END,
+          collect_time DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `;
+
+      const list = await this.app.mysql.query(sql);
+
+      // 查询总数
+      const countSql = `
+        SELECT COUNT(*) as total
+        FROM articles
+        WHERE ${whereClause}
+      `;
+      const countResult = await this.app.mysql.query(countSql);
+      const total = countResult[0].total;
+
+      ctx.body = {
+        success: true,
+        data: {
+          list,
+          total,
+          page: parseInt(page),
+          pageSize: parseInt(pageSize)
+        },
+        message: '搜索成功',
+      };
+
+    } catch (error) {
+      ctx.logger.error('搜索文章失败:', error);
+      ctx.body = {
+        success: false,
+        message: '搜索失败',
+        error: error.message,
+      };
+      ctx.status = 500;
+    }
+  }
 }
 
 module.exports = ArticleController;

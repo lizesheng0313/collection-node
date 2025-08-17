@@ -44,11 +44,11 @@ module.exports = appInfo => {
       // host
       host: process.env.DB_HOST || '127.0.0.1',
       // 端口号
-      port: process.env.DB_PORT || '3306',
+      port: parseInt(process.env.DB_PORT) || 3306,
       // 用户名
       user: process.env.DB_USER || 'root',
       // 密码
-      password: process.env.DB_PASSWORD || '',
+      password: process.env.DB_PASSWORD || '@lizesheng123@',
       // 数据库名
       database: process.env.DB_NAME || 'blog',
       // 字符编码设置 - 支持emoji和4字节UTF-8字符

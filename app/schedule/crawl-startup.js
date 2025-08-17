@@ -3,9 +3,9 @@ const Subscription = require('egg').Subscription;
 class CrawlStartup extends Subscription {
   static get schedule() {
     return {
-      immediate: true,
+      immediate: false,
       type: 'worker',
-      disable: false,
+      disable: true,
     };
   }
 

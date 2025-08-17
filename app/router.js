@@ -6,6 +6,7 @@ module.exports = app => {
 
   // JWT中间件
   const jwt = middleware.jwt();
+  const miniprogramAuth = middleware.miniprogramAuth();
 
   // 认证相关路由
   router.post('/api/auth/login', controller.auth.login);
@@ -18,6 +19,7 @@ module.exports = app => {
   router.post('/api/articles/delete/:id', jwt, controller.article.destroy);
   router.get('/api/articles/detail/:id', controller.article.show);
   router.get('/api/articles/list', controller.article.index);
+  router.get('/api/articles/search', controller.article.search);
 
   // GitHub项目相关路由
   router.get('/api/articles/github', controller.article.github);
@@ -43,4 +45,13 @@ module.exports = app => {
   router.get('/api/crawler/history', controller.crawler.history);
   router.post('/api/crawler/clear-cache', controller.crawler.clearCache);
   router.get('/api/crawler/languages', controller.crawler.languages);
+
+  // 小程序相关路由
+  router.post('/api/miniprogram/login', controller.miniprogram.login);
+  router.post('/api/miniprogram/updateUserInfo', miniprogramAuth, controller.miniprogram.updateUserInfo);
+  router.get('/api/miniprogram/userInfo', miniprogramAuth, controller.miniprogram.getUserInfo);
+  router.post('/api/miniprogram/addFavorite', miniprogramAuth, controller.miniprogram.addFavorite);
+  router.post('/api/miniprogram/removeFavorite', miniprogramAuth, controller.miniprogram.removeFavorite);
+  router.get('/api/miniprogram/favorites', miniprogramAuth, controller.miniprogram.getFavorites);
+  router.get('/api/miniprogram/checkFavorite/:articleId', miniprogramAuth, controller.miniprogram.checkFavorite);
 };
