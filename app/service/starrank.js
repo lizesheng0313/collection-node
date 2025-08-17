@@ -157,75 +157,65 @@ class StarRankService extends Service {
     const { page = 1, limit = 25, sort = 'stars', order = 'desc' } = options;
 
     try {
-      // 先从数据库搜索
+      // 只从数据库搜索，不调用GitHub API
       const dbResults = await this.searchFromDatabase(query, { page, limit, sort, order });
 
-      // 如果数据库结果不足，从GitHub搜索
-      let githubResults = [];
-      if (dbResults.length < limit) {
-        githubResults = await this.service.github.searchRepositories(query, {
-          page,
-          limit: limit - dbResults.length,
-          sort,
-          order,
-        });
-
-        // 处理GitHub搜索结果
-        for (const repo of githubResults) {
-          // 翻译描述
-          if (repo.description && !repo.description_cn) {
-            try {
-              const translated = await this.service.ai.translateToChinese(repo.description);
-              repo.description_cn = translated;
-            } catch (error) {
-              this.logger.warn(`Translation failed for ${repo.full_name}:`, error);
-              repo.description_cn = repo.description;
-            }
-          }
-
-          // 先进行商业价值分析，再保存到数据库
-          try {
-            this.logger.info(`🤖 Starting AI analysis for ${repo.full_name}...`);
-
-            // 进行AI商业价值分析
-            const analysis = await this.service.ai.analyzeBusinessValue(repo);
-
-            if (analysis && analysis.overall_score) {
-              // 只有分析成功才保存项目
-              const repoId = await this.saveRepository(repo, analysis);
-              if (repoId) {
-                this.logger.info(`✅ Successfully analyzed and saved ${repo.full_name} with score ${analysis.overall_score}`);
-              }
-            } else {
-              this.logger.warn(`❌ Business analysis failed for ${repo.full_name}, skipping save`);
-            }
-          } catch (error) {
-            this.logger.warn(`Failed to analyze and save repo ${repo.full_name}:`, error);
-          }
-        }
-      }
-
-      const allResults = [ ...dbResults, ...githubResults ];
+      // 获取总数用于分页
+      const totalCount = await this.getSearchTotalCount(query);
 
       return {
         success: true,
         data: {
-          repositories: allResults,
+          list: dbResults,  // 只保留list字段
+          total: totalCount,
           pagination: {
             page: parseInt(page),
             limit: parseInt(limit),
-            total: allResults.length,
+            total: totalCount,
           },
           query,
-          sources: {
-            database: dbResults.length,
-            github: githubResults.length,
-          },
         },
       };
     } catch (error) {
       this.logger.error('Failed to search repositories:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 获取搜索结果总数
+   * @param {string} query - 搜索关键词
+   * @return {Promise<number>} 总数
+   */
+  async getSearchTotalCount(query) {
+    try {
+      // 构建搜索条件
+      const where = {
+        article_type: 'github_project',
+        status: 'published',
+      };
+
+      // 使用LIKE搜索
+      const searchConditions = [
+        `github_full_name LIKE '%${query}%'`,
+        `title LIKE '%${query}%'`,
+        `original_description LIKE '%${query}%'`,
+        `translated_description LIKE '%${query}%'`,
+        `programming_language LIKE '%${query}%'`,
+        `topics LIKE '%${query}%'`,
+        `content LIKE '%${query}%'`,
+      ];
+
+      const whereClause = `${Object.keys(where).map(key => `${key} = '${where[key]}'`).join(' AND ')} AND (${searchConditions.join(' OR ')})`;
+
+      const countResult = await this.app.mysql.query(
+        `SELECT COUNT(*) as total FROM articles WHERE ${whereClause}`
+      );
+
+      return countResult[0]?.total || 0;
+    } catch (error) {
+      this.logger.error('Failed to get search total count:', error);
+      return 0;
     }
   }
 
@@ -248,10 +238,12 @@ class StarRankService extends Service {
       // 使用LIKE搜索
       const searchConditions = [
         `github_full_name LIKE '%${query}%'`,
+        `title LIKE '%${query}%'`,
         `original_description LIKE '%${query}%'`,
         `translated_description LIKE '%${query}%'`,
         `programming_language LIKE '%${query}%'`,
         `topics LIKE '%${query}%'`,
+        `content LIKE '%${query}%'`,
       ];
 
       const sql = `
@@ -260,11 +252,11 @@ class StarRankService extends Service {
           AND status = 'published'
           AND (${searchConditions.join(' OR ')})
         ORDER BY ${sort} ${order.toUpperCase()}
-        LIMIT ? OFFSET ?
+        LIMIT ${limit} OFFSET ${(page - 1) * limit}
       `;
 
-      const offset = (page - 1) * limit;
-      const results = await this.app.mysql.query(sql, [ limit, offset ]);
+      this.logger.info('Search SQL:', sql);
+      const results = await this.app.mysql.query(sql);
 
       return results.map(row => this.service.article.formatArticleData(row));
     } catch (error) {

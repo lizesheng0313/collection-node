@@ -128,6 +128,12 @@ module.exports = appInfo => {
     },
   };
 
+  // 微信小程序配置
+  config.miniprogram = {
+    appId: process.env.WECHAT_APP_ID || '', // 从环境变量获取
+    appSecret: process.env.WECHAT_APP_SECRET || '', // 从环境变量获取
+  };
+
   return {
     ...config,
     ...userConfig,

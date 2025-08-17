@@ -29,7 +29,6 @@ module.exports = app => {
 
   // GitHub相关路由
   router.get('/api/github/trending', controller.github.trending);
-  router.get('/api/github/search', controller.github.search);
   router.get('/api/github/repos/:owner/:repo', controller.github.repository);
   router.get('/api/github/suggestions', controller.github.suggestions);
 
@@ -54,4 +53,11 @@ module.exports = app => {
   router.post('/api/miniprogram/removeFavorite', miniprogramAuth, controller.miniprogram.removeFavorite);
   router.get('/api/miniprogram/favorites', miniprogramAuth, controller.miniprogram.getFavorites);
   router.get('/api/miniprogram/checkFavorite/:articleId', miniprogramAuth, controller.miniprogram.checkFavorite);
+
+  // 评论相关路由
+  router.get('/api/comments', controller.comments.index);
+  router.post('/api/comments', controller.comments.create);
+  router.get('/api/comments/:id', controller.comments.show);
+  router.post('/api/comments/:id/like', controller.comments.like);
+  router.post('/api/comments/:id/reply', controller.comments.reply);
 };
