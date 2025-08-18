@@ -161,6 +161,79 @@ class ArticleService extends Service {
   }
 
   /**
+   * 搜索文章
+   * @param {String} keyword - 搜索关键词
+   * @param {Number} page - 页码
+   * @param {Number} pageSize - 每页数量
+   * @param {String} article_type - 文章类型
+   * @return {Object} 搜索结果
+   */
+  async searchArticles(keyword, page = 1, pageSize = 10, article_type) {
+    const offset = (page - 1) * pageSize;
+    let whereClause = `(title LIKE '%${keyword}%' OR content LIKE '%${keyword}%' OR translated_description LIKE '%${keyword}%' OR original_description LIKE '%${keyword}%')`;
+
+    if (article_type && article_type !== 'all') {
+      whereClause += ` AND article_type = '${article_type}'`;
+    }
+
+    whereClause += ` AND status = 'published'`;
+
+    // 查询搜索结果
+    const sql = `
+      SELECT *
+      FROM articles
+      WHERE ${whereClause}
+      ORDER BY
+        CASE
+          WHEN title LIKE '%${keyword}%' THEN 1
+          WHEN translated_description LIKE '%${keyword}%' THEN 2
+          WHEN original_description LIKE '%${keyword}%' THEN 3
+          ELSE 4
+        END,
+        collect_time DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `;
+
+    const list = await this.app.mysql.query(sql);
+
+    // 查询总数
+    const countSql = `
+      SELECT COUNT(*) as total
+      FROM articles
+      WHERE ${whereClause}
+    `;
+    const countResult = await this.app.mysql.query(countSql);
+    const total = countResult[0].total;
+
+    // 格式化数据，与getGitHubProjects保持一致
+    const formattedList = list.map(item => ({
+      id: item.id,
+      title: item.title,
+      translated_description: item.translated_description,
+      original_description: item.original_description,
+      content: item.content,
+      article_type: item.article_type,
+      github_url: item.github_url,
+      github_full_name: item.github_full_name,
+      stars_count: item.stars_count,
+      forks_count: item.forks_count,
+      programming_language: item.programming_language,
+      read_count: item.read_count || 0,
+      collect_time: item.collect_time,
+      status: item.status,
+      created_at: item.created_at,
+      updated_at: item.updated_at
+    }));
+
+    return {
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      total,
+      list: formattedList,
+    };
+  }
+
+  /**
    * 获取GitHub项目列表
    * @param {Number} page - 页码
    * @param {Number} pageSize - 每页条数
